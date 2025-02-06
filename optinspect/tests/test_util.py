@@ -16,7 +16,6 @@ def test_before_after_update_missing() -> None:
         optinspect.before_after_update(None)
 
 
-@pytest.mark.parametrize("skip_if_traced", [True, False])
 def test_before_after_update(skip_if_traced: bool) -> None:
     x = jnp.array(4.0)
     value_and_grad = jax.value_and_grad(jnp.square)

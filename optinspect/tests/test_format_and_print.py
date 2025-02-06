@@ -6,7 +6,6 @@ import pytest
 import re
 
 
-@pytest.mark.parametrize("skip_if_traced", [True, False])
 def test_print_on_update(capsys: pytest.CaptureFixture, skip_if_traced: bool):
     x = jnp.array(4.0)
     value_and_grad = jax.value_and_grad(jnp.square)
@@ -39,7 +38,6 @@ def test_print_on_update(capsys: pytest.CaptureFixture, skip_if_traced: bool):
         assert "2: updates=Traced<ShapedArray(float32[], weak_type=True)>" in out
 
 
-@pytest.mark.parametrize("skip_if_traced", [False, True])
 def test_print_before_after_update(
     capsys: pytest.CaptureFixture, skip_if_traced: bool
 ) -> None:
