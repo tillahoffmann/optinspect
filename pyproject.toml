@@ -1,0 +1,14 @@
+[project]
+
+name = "optinspect"
+version = "0.1.0"
+dependencies = [
+    "jax",
+    "jaxlib",
+    "optax",
+]
+description = "Inspect and debug optax gradient transformations."
+
+[tool.setuptools.packages]
+
+find = {}

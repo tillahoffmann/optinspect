@@ -1,0 +1,4 @@
+-e file:.
+black
+pytest
+pytest-cov
