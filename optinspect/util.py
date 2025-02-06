@@ -59,7 +59,7 @@ def before_after_update(
     skip_if_traced: bool = True,
 ) -> optax.GradientTransformationExtraArgs:
     """
-    Execute functions before and after applying a transformation.
+    Call functions before and after applying a transformation.
 
     Args:
         inner: Gradient transformation to wrap.
