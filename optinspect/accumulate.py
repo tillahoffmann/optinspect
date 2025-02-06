@@ -1,7 +1,7 @@
 import jax
 import optax
 from typing import Any, Callable, NamedTuple, Optional, Union
-from .util import is_traced
+from .util import maybe_skip_if_traced, is_traced
 
 
 def _make_key_func(key: Union[str, int, Callable]) -> Callable:
@@ -82,8 +82,9 @@ class AccumulateOnUpdateState(NamedTuple):
     value: Any
 
 
+@maybe_skip_if_traced
 def accumulate_on_update(
-    func: Callable, init: Any = None, *, skip_if_traced: bool = True
+    func: Callable, init: Any = None, *, skip_if_traced: bool
 ) -> optax.GradientTransformationExtraArgs:
     """
     Accumulate updates, parameters, or extra arguments without channging updates.
