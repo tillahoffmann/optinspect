@@ -2,6 +2,8 @@ import jax
 from jax import numpy as jnp
 import optax
 import optinspect
+import os
+from unittest import mock
 import pytest
 
 
@@ -41,3 +43,28 @@ def test_before_after_update(skip_if_traced: bool) -> None:
         # This fails because the before and after append functions have side effects.
         with pytest.raises(Exception, match="Leaked trace"), jax.check_tracer_leaks():
             jax.jit(optim.update)(grad, state, x)
+
+
+def test_maybe_skip_if_traced() -> None:
+    with pytest.raises(ValueError, match="does not have a parameter"):
+        optinspect.util.maybe_skip_if_traced(lambda: None)
+    with pytest.raises(ValueError, match="must be keyword-only"):
+        optinspect.util.maybe_skip_if_traced(lambda skip_if_traced: None)
+    with pytest.raises(ValueError, match="must not have a default value"):
+        optinspect.util.maybe_skip_if_traced(lambda *, skip_if_traced="foo": None)
+
+    func = optinspect.util.maybe_skip_if_traced(
+        lambda *, skip_if_traced: skip_if_traced
+    )
+    assert (
+        "INSPECT_IF_TRACED" not in os.environ
+    ), "Environment variable `INSPECT_IF_TRACED` must not be set for tests."
+
+    assert func(skip_if_traced=False) is False
+    assert func(skip_if_traced=True) is True
+    assert func() is True
+
+    with mock.patch.dict(os.environ, {"INSPECT_IF_TRACED": "true"}):
+        assert func(skip_if_traced=False) is False
+        assert func(skip_if_traced=True) is True
+        assert func() is False

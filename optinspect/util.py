@@ -18,15 +18,15 @@ def get_skip_if_traced(skip_if_traced: Optional[bool]) -> bool:
 
     Args:
         skip_if_traced: Whether to skip the transformation if traced. If :code:`None`,
-            skip unless the :code:`INSPECT_IF_TRACED` environment variable is set.
+            skip unless the :code:`INSPECT_IF_TRACED` environment variable is not set.
 
     Returns:
         :code:`skip_if_traced` if the input is not :code:`None`, otherwise whether the
-        environment variable :code:`INSPECT_IF_TRACED` is set.
+        environment variable :code:`INSPECT_IF_TRACED` is not set.
     """
-    return (
-        "INSPECT_IF_TRACED" in os.environ if skip_if_traced is None else skip_if_traced
-    )
+    if skip_if_traced is None:
+        return "INSPECT_IF_TRACED" not in os.environ
+    return skip_if_traced
 
 
 def maybe_skip_if_traced(func: Callable) -> Callable:
@@ -37,14 +37,18 @@ def maybe_skip_if_traced(func: Callable) -> Callable:
 
     signature = inspect.signature(func)
     parameter = signature.parameters.get("skip_if_traced")
-    if (
-        parameter is None
-        or parameter.kind is not parameter.KEYWORD_ONLY
-        or parameter.default is not parameter.empty
-    ):
+    if parameter is None:
         raise ValueError(
-            f"Function `{func}` does not have a keyword-only argument `skip_if_traced` "
-            "without default values."
+            f"Function `{func}` does not have a parameter `skip_if_traced`."
+        )
+    if parameter.kind is not parameter.KEYWORD_ONLY:
+        raise ValueError(
+            f"Parameter `skip_if_traced` of function `{func}` must be keyword-only."
+        )
+    if parameter.default is not parameter.empty:
+        raise ValueError(
+            f"Parameter `skip_if_traced` of function `{func}` must not have a default "
+            "value."
         )
 
     @functools.wraps(func)
