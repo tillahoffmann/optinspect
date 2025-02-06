@@ -78,11 +78,12 @@ def on_update(
     func: Callable, *, skip_if_traced: bool
 ) -> optax.GradientTransformationExtraArgs:
     """
-    Call a function and leave the updates unchanged.
+    Call a pure function without return value and leave the updates unchanged.
 
     Args:
-        func: Function receiving keyword arguments :code:`updates`, :code:`params`, and
-            unpacked :code:`**extra_args`.
+        func: Pure function with the same signature as
+            :meth:`~optax.GradientTransformationExtraArgs.update` (although only
+            accepting keyword arguments). Any return value is discarded.
         skip_if_traced: Skip printing if any of the arguments passed to :code`update`
             are traced.
 
@@ -116,16 +117,17 @@ def before_after_update(
     skip_if_traced: bool,
 ) -> optax.GradientTransformationExtraArgs:
     """
-    Call functions before and after applying a transformation.
+    Call pure functions without return values before and after applying a
+    transformation.
 
     Args:
         inner: Gradient transformation to wrap.
-        before: Function to call before applying :code:`inner`, receiving
-            :code:`updates`, :code:`state`, :code:`params`, and unpacked
-            :code:`**extra_args` as keyword arguments.
-        after: Function to call after applying :code:`inner`, receiving
-            :code:`updates`, :code:`state`, :code:`params`, and unpacked
-            :code:`**extra_args` as keyword arguments.
+        before: Function to call before applying :code:`inner` with the same signature
+            as :meth:`~optax.GradientTransformationExtraArgs.update` (although only
+            accepting keyword arguments). Any return value is discarded.
+        after: Function to call after applying :code:`inner` with the same signature
+            as :meth:`~optax.GradientTransformationExtraArgs.update` (although only
+            accepting keyword arguments). Any return value is discarded.
         skip_if_traced: Skip execution of :code:`before` and :code:`after` if the state
             of :code:`inner` is traced.
 
