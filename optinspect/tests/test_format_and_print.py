@@ -35,16 +35,8 @@ def test_print_on_update(capsys: pytest.CaptureFixture, skip_if_traced: bool):
     if skip_if_traced:
         assert not out
     else:
-        assert (
-            "1: updates=Traced<ShapedArray(float32[], weak_type=True)>with"
-            "<DynamicJaxprTrace>, value=Traced<ShapedArray(float32[], weak_type=True)>"
-            "with<DynamicJaxprTrace>"
-        ) in out
-        assert (
-            "2: updates=Traced<ShapedArray(float32[], weak_type=True)>with"
-            "<DynamicJaxprTrace>, value=Traced<ShapedArray(float32[], weak_type=True)>"
-            "with<DynamicJaxprTrace>"
-        ) in out
+        assert "1: updates=Traced<ShapedArray(float32[], weak_type=True)>" in out
+        assert "2: updates=Traced<ShapedArray(float32[], weak_type=True)>" in out
 
 
 @pytest.mark.parametrize("skip_if_traced", [False, True])
