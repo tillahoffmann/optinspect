@@ -1,7 +1,58 @@
+import functools
+import inspect
 import jax
 from jax.core import Tracer
 import optax
+import os
 from typing import Any, Callable, Optional
+
+
+def get_skip_if_traced(skip_if_traced: Optional[bool]) -> bool:
+    """
+    Determine if a transformation should be skipped if traced.
+
+    .. warning::
+
+        Whether a transformation is skipped if traced is determined when the transform
+        is `created`, not on a case-by-case basis when it is `applied`.
+
+    Args:
+        skip_if_traced: Whether to skip the transformation if traced. If :code:`None`,
+            skip unless the :code:`INSPECT_IF_TRACED` environment variable is set.
+
+    Returns:
+        :code:`skip_if_traced` if the input is not :code:`None`, otherwise whether the
+        environment variable :code:`INSPECT_IF_TRACED` is set.
+    """
+    return (
+        "INSPECT_IF_TRACED" in os.environ if skip_if_traced is None else skip_if_traced
+    )
+
+
+def maybe_skip_if_traced(func: Callable) -> Callable:
+    """
+    Wrap a function with keyword-only argument :code:`skip_if_traced` and normalize it
+    based on its value and the environment variable :code:`INSPECT_IF_TRACED` begin set.
+    """
+
+    signature = inspect.signature(func)
+    parameter = signature.parameters.get("skip_if_traced")
+    if (
+        parameter is None
+        or parameter.kind is not parameter.KEYWORD_ONLY
+        or parameter.default is not parameter.empty
+    ):
+        raise ValueError(
+            f"Function `{func}` does not have a keyword-only argument `skip_if_traced` "
+            "without default values."
+        )
+
+    @functools.wraps(func)
+    def _wrapped(*args, skip_if_traced: Optional[bool] = None, **kwargs):
+        skip_if_traced = get_skip_if_traced(skip_if_traced)
+        return func(*args, skip_if_traced=skip_if_traced, **kwargs)
+
+    return _wrapped
 
 
 def is_traced(*args: Any) -> bool:
@@ -18,8 +69,9 @@ def is_traced(*args: Any) -> bool:
     return any(isinstance(leaf, Tracer) for leaf in leaves)
 
 
+@maybe_skip_if_traced
 def on_update(
-    func: Callable, *, skip_if_traced: bool = True
+    func: Callable, *, skip_if_traced: bool
 ) -> optax.GradientTransformationExtraArgs:
     """
     Call a function and leave the updates unchanged.
@@ -51,12 +103,13 @@ def on_update(
     return optax.GradientTransformationExtraArgs(init, update)
 
 
+@maybe_skip_if_traced
 def before_after_update(
     inner: optax.GradientTransformationExtraArgs,
     before: Optional[Callable] = None,
     after: Optional[Callable] = None,
     *,
-    skip_if_traced: bool = True,
+    skip_if_traced: bool,
 ) -> optax.GradientTransformationExtraArgs:
     """
     Call functions before and after applying a transformation.

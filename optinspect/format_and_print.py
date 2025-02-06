@@ -1,15 +1,16 @@
 import functools
 import optax
 from typing import Any, Optional
-from .util import before_after_update, on_update
+from .util import before_after_update, maybe_skip_if_traced, on_update
 
 
 def _format_and_print(format: str, **kwargs: Any) -> None:
     return print(format.format(**kwargs))
 
 
+@maybe_skip_if_traced
 def print_on_update(
-    format: str, *, skip_if_traced: bool = True
+    format: str, *, skip_if_traced: bool
 ) -> optax.GradientTransformationExtraArgs:
     """
     Print updates, parameters, or extra arguments without changing updates.
@@ -28,12 +29,13 @@ def print_on_update(
     )
 
 
+@maybe_skip_if_traced
 def print_before_after_update(
     inner: optax.GradientTransformation,
     before_format: Optional[str] = None,
     after_format: Optional[str] = None,
     *,
-    skip_if_traced: bool = True,
+    skip_if_traced: bool,
 ) -> optax.GradientTransformationExtraArgs:
     """
     Print state information before and/or after updates.
