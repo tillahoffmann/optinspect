@@ -2,6 +2,7 @@ __pycache__
 .coverage*
 .vscode
 *.egg-info
+docs/_build
 htmlcov
 playground
 venv
