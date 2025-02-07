@@ -1,15 +1,7 @@
 import jax
 import optax
 from typing import Any, Callable, NamedTuple, Optional, Union
-from .util import maybe_skip_if_traced, is_traced
-
-
-def _make_key_func(key: Union[str, int, Callable]) -> Callable:
-    if isinstance(key, str):
-        return lambda **kwargs: kwargs[key]
-    elif callable(key):
-        return key
-    raise ValueError(f"`key` must be a string or callable but got {key}.")
+from .util import is_traced, make_key_func, maybe_skip_if_traced
 
 
 def accumulate_cumulative_average(
@@ -29,7 +21,7 @@ def accumulate_cumulative_average(
     Returns:
         Accumulator function.
     """
-    key_func = _make_key_func(key)
+    key_func = make_key_func(key)
 
     def _accumulate(
         count: int,
@@ -62,7 +54,7 @@ def accumulate_most_recent(key: Union[str, Callable] = "updates") -> Callable:
     Returns:
         Accumulator function.
     """
-    key_func = _make_key_func(key)
+    key_func = make_key_func(key)
 
     def _accumulate(
         count: int,

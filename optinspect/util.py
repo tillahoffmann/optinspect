@@ -4,7 +4,18 @@ import jax
 from jax.core import Tracer
 import optax
 import os
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
+
+
+def make_key_func(key: Union[str, Callable]) -> Callable:
+    """
+    Create a function to extract a value from a dictionary passed as keyword arguments.
+    """
+    if isinstance(key, str):
+        return lambda **kwargs: kwargs[key]
+    elif callable(key):
+        return key
+    raise ValueError(f"`key` must be a string or callable but got {key}.")
 
 
 def get_skip_if_traced(skip_if_traced: Optional[bool]) -> bool:
