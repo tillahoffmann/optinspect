@@ -10,7 +10,11 @@ from typing import Any, Callable
     [
         (optinspect.accumulate_cumulative_average(), 4.5),
         (optinspect.accumulate_cumulative_average(period=4), 8.5),
-        (optinspect.accumulate_most_recent(lambda **kwargs: kwargs["state"].count), 9),
+        (
+            optinspect.accumulate_most_recent(lambda _1, state, *_2, **_3: state.count),
+            9,
+        ),
+        (optinspect.accumulate_cumulative_average(0), 4.5),
     ],
 )
 @pytest.mark.parametrize("scan", [False, True], ids=["loop", "scan"])
@@ -19,9 +23,7 @@ def test_accumulate(
 ) -> None:
     n = 10
     x = 4
-    optim = optinspect.accumulate_on_update(
-        accumulate_func, skip_if_traced=skip_if_traced
-    )
+    optim = optinspect.accumulate_update(accumulate_func, skip_if_traced=skip_if_traced)
     state = optim.init(x)
 
     if scan:
@@ -45,5 +47,5 @@ def test_accumulate(
 
 
 def test_accumulate_invalid_key() -> None:
-    with pytest.raises(ValueError, match="must be a string or callable"):
-        optinspect.accumulate_cumulative_average(key=9)
+    with pytest.raises(ValueError, match="must be a string, integer, or callable"):
+        optinspect.accumulate_cumulative_average(key=1.3)

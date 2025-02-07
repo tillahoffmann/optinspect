@@ -6,8 +6,8 @@ optinspect
 
 `optinspect` provides `optax` gradient transformation to inspect optimization algorithms while leaveing updates unchanged. `optinspect` transformations belong to two categories:
 
-- :code:`*_on_update` transformations to inspect updates directly.
-- :code:`*_before_after_update` transformations to inspect the state of a wrapped transformation before and after it is applied.
+- :code:`*_update` transformations to inspect updates directly.
+- :code:`*_wrapped` transformations to inspect the state of a wrapped transformation after it is applied.
 
 .. doctest::
 
@@ -20,9 +20,9 @@ optinspect
     >>> params = 4.0
 
     >>> optim = optax.chain(
-    ...     optinspect.trace_on_update("raw"),
+    ...     optinspect.trace_update("raw"),
     ...     optax.clip_by_global_norm(1.0),
-    ...     optinspect.trace_on_update("clipped"),
+    ...     optinspect.trace_update("clipped"),
     ...     optinspect.trace_wrapped(
     ...         optax.scale_by_adam(), "adam_nu", key=lambda state, **_: state.nu
     ...     ),

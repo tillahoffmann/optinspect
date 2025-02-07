@@ -1,22 +1,23 @@
 from .accumulate import (
     accumulate_cumulative_average,
-    accumulate_on_update,
     accumulate_most_recent,
+    accumulate_update,
 )
-from .format_and_print import print_before_after_update, print_on_update
-from .trace import get_trace, trace_on_update, trace_wrapped
-from .util import before_after_update, is_traced, on_update
+from .format_and_print import print_wrapped, print_update
+from .trace import get_trace, trace_update, trace_wrapped
+from .util import frepr, inspect_update, inspect_wrapped, is_traced
 
 __all__ = [
     "accumulate_cumulative_average",
-    "accumulate_on_update",
     "accumulate_most_recent",
-    "before_after_update",
+    "accumulate_update",
+    "frepr",
     "get_trace",
+    "inspect_update",
+    "inspect_wrapped",
     "is_traced",
-    "on_update",
-    "print_before_after_update",
-    "print_on_update",
-    "trace_on_update",
+    "print_update",
+    "print_wrapped",
+    "trace_update",
     "trace_wrapped",
 ]

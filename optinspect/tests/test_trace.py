@@ -9,11 +9,11 @@ def test_trace(value_and_grad_and_params: tuple[Callable, optax.Params]) -> None
     value_and_grad, params = value_and_grad_and_params
 
     optim = optax.chain(
-        optinspect.trace_on_update("step 1"),
+        optinspect.trace_update("step 1"),
         optax.scale_by_adam(),
-        optinspect.trace_on_update("step 2", key="value"),
+        optinspect.trace_update("step 2", key="value"),
         optax.scale_by_learning_rate(0.1),
-        optinspect.trace_on_update("step 3"),
+        optinspect.trace_update("step 3"),
     )
 
     state = optim.init(params)
@@ -32,9 +32,9 @@ def test_trace(value_and_grad_and_params: tuple[Callable, optax.Params]) -> None
 
 def test_trace_duplicate_key() -> None:
     optim = optax.chain(
-        optinspect.trace_on_update("step 1"),
+        optinspect.trace_update("step 1"),
         optax.scale_by_adam(),
-        optinspect.trace_on_update("step 1"),
+        optinspect.trace_update("step 1"),
     )
     state = optim.init(4.0)
     state = optim.update(3.0, state)

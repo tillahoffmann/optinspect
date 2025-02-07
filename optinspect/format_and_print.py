@@ -1,62 +1,54 @@
 import functools
 import optax
-from typing import Any, Optional
-from .util import before_after_update, maybe_skip_if_traced, on_update
+from typing import Any
+from .util import inspect_wrapped, inspect_update
 
 
-def _format_and_print(format: str, **kwargs: Any) -> None:
-    return print(format.format(**kwargs))
+def _format_and_print(format: str, *args: Any, **kwargs: Any) -> None:
+    # Augment the keyword arguments with the values from positional arguments.
+    kwargs.update(dict(zip(["updates", "state", "params"], args)))
+    return print(format.format(*args, **kwargs))
 
 
-@maybe_skip_if_traced
-def print_on_update(
-    format: str, *, skip_if_traced: bool
+def print_update(
+    format: str, *, skip_if_traced: bool = None
 ) -> optax.GradientTransformationExtraArgs:
     """
-    Print updates, parameters, or extra arguments without changing updates.
+    Print updates, parameters, or extra arguments.
 
     Args:
-        format: Format string receiving keyword arguments :code:`updates`,
-            :code:`params`, and unpacked :code:`**extra_args`.
-        skip_if_traced: Skip printing if any of the arguments passed to :code`update`
-            are traced.
+        format: Format string, receiving the same positional and keyword arguments as
+            :func:`~.optax.GradientTransformationExtraArgs`.
+        skip_if_traced: Skip if the :code:`updates` argument is traced.
 
     Returns:
-        Gradient transformation that prints and leaves updates unchanged.
+        Gradient transformation.
     """
-    return on_update(
+    return inspect_update(
         functools.partial(_format_and_print, format), skip_if_traced=skip_if_traced
     )
 
 
-@maybe_skip_if_traced
-def print_before_after_update(
+def print_wrapped(
     inner: optax.GradientTransformation,
-    before_format: Optional[str] = None,
-    after_format: Optional[str] = None,
+    format: str,
     *,
-    skip_if_traced: bool,
+    skip_if_traced: bool = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
-    Print state information before and/or after updates.
+    Print state information after an update.
 
     Args:
-        inner: Transformation whose state to monitor.
-        before_format: Format string to use before updates, receiving keyword arguments
-            :code:`state`, :code:`updates`, :code:`params`, and unpacked
-            :code:`**extra_args`.
-        after_format: Format string to use after updates, receiving keyword arguments
-            :code:`state`, :code:`updates`, :code:`params`, and unpacked
-            :code:`**extra_args`.
-        skip_if_traced: Skip printing if the state is traced.
+        inner: Transformation whose state to inspect.
+        format: Format string, receiving the same positional and keyword arguments as
+            :func:`~.optax.GradientTransformationExtraArgs`.
+        skip_if_traced: Skip if the :code:`updates` argument is traced.
 
     Returns:
-        Gradient transform that prints state information before and/or after updates and
-        leaves updates unchanged.
+        Gradient transform.
     """
-    return before_after_update(
+    return inspect_wrapped(
         inner,
-        functools.partial(_format_and_print, before_format) if before_format else None,
-        functools.partial(_format_and_print, after_format) if after_format else None,
+        functools.partial(_format_and_print, format),
         skip_if_traced=skip_if_traced,
     )
