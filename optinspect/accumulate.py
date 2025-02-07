@@ -1,7 +1,7 @@
 import jax
 import optax
 from typing import Any, Callable, NamedTuple, Optional, Union
-from .util import is_traced, make_key_func, maybe_skip_if_traced
+from .util import inspect_update, make_key_func
 
 
 def accumulate_cumulative_average(
@@ -12,10 +12,10 @@ def accumulate_cumulative_average(
     Accumulate the cumulative average.
 
     Args:
-        key: Quantity to accumulate. If a string, accumulate a keyword argument. If a
-            callable with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.update` (although only
-            accepting keyword arguments), accumulate the returned value.
+        key: Quantity to accumulate. If a callable with the same signature as
+            :meth:`~optax.GradientTransformationExtraArgs.update`, accumulate the
+            returned value. If a string, accumulate arguments by name. If an integer,
+            accumulate arguments by their position.
         period: Period after which the cumulative average resets.
 
     Returns:
@@ -24,18 +24,16 @@ def accumulate_cumulative_average(
     key_func = make_key_func(key)
 
     def _accumulate(
-        count: int,
-        value: Any,
         updates: optax.Updates,
-        state: optax.OptState,
+        state: AccumulateState,
         params: Optional[optax.Params] = None,
         **extra_args: Any,
     ) -> Any:
-        step = count % period if period else count
+        step = state.count % period if period else state.count
         return jax.tree.map(
             lambda old, new: (step * old + new) / (step + 1),
-            value,
-            key_func(updates=updates, state=state, params=params, **extra_args),
+            state.value,
+            key_func(updates, state, params, **extra_args),
         )
 
     return _accumulate
@@ -46,10 +44,10 @@ def accumulate_most_recent(key: Union[str, Callable] = "updates") -> Callable:
     Accumulate the most recent value.
 
     Args:
-        key: Quantity to accumulate. If a string, accumulate a keyword argument. If a
-            callable with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.update` (although only
-            accepting keyword arguments), accumulate the returned value.
+        key: Quantity to accumulate. If a callable with the same signature as
+            :meth:`~optax.GradientTransformationExtraArgs.update`, accumulate the
+            returned value. If a string, accumulate arguments by name. If an integer,
+            accumulate arguments by their position.
 
     Returns:
         Accumulator function.
@@ -57,63 +55,65 @@ def accumulate_most_recent(key: Union[str, Callable] = "updates") -> Callable:
     key_func = make_key_func(key)
 
     def _accumulate(
-        count: int,
-        value: Any,
         updates: optax.Updates,
-        state: optax.OptState,
+        state: AccumulateState,
         params: Optional[optax.Params] = None,
         **extra_args: Any,
-    ) -> Any:
-        return key_func(updates=updates, state=state, params=params, **extra_args)
+    ) -> optax.Params:
+        return key_func(updates, state, params, **extra_args)
 
     return _accumulate
 
 
-class AccumulateOnUpdateState(NamedTuple):
+class AccumulateState(NamedTuple):
+    """
+    State for accumulating values.
+
+    Attributes:
+        count: Iteration number.
+        value: Accumulated value.
+    """
+
     count: int
-    value: Any
+    value: optax.Params
 
 
-@maybe_skip_if_traced
-def accumulate_on_update(
-    func: Callable, init: Any = None, *, skip_if_traced: bool
+def accumulate_update(
+    accumulate: optax.GradientTransformationExtraArgs,
+    init: Optional[optax.TransformInitFn] = None,
+    *,
+    skip_if_traced: bool = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
-    Accumulate updates, parameters, or extra arguments without channging updates.
+    Accumulate updates, parameters, or extra arguments.
 
     Args:
-        func: Accumulator function, receiving the iteration number as its first
-            argument, previous accumulated value as its second argument, and
-            :code:`updates`, :code:`state`, :code:`params`, and unpacked
-            :code:`**extra_args` as keyword arguments.
-        init: Initial state of the accumulator, defaults to the argument passed to
-            :code:`init`.
-        skip_if_traced: Skip accumulation if any of the arguments passed to
-            :code`update` are traced.
+        accumulate: Accumulation function with the same signature as
+            :meth:`~optax.GradientTransformationExtraArgs.update`, returning the updated
+            accumulated value.
+        init: Callable to initialize the :cls:`.AccumulateState` or :code:`None` to
+            initialize with the parameters passed to the :code:`init` function of the
+            transformation.
+        skip_if_traced: Skip accumulation if the :code:`updates` argument is traced.
+
+    Returns:
+        Gradient transformation.
+
+    .. seealso::
+
+        :func:`.accumulate_cumulative_average`, :func:`.accumulate_most_recent`.
     """
 
-    # We don't use `optinspect.util.on_update` because we need to keep track of the
-    # accumulator state.
-    def init_func(params: optax.Params) -> AccumulateOnUpdateState:
-        return AccumulateOnUpdateState(0, params if init is None else init)
+    _init = init or (lambda params: AccumulateState(0, params))
 
-    def update_func(
+    def _update(
         updates: optax.Updates,
-        state: AccumulateOnUpdateState,
+        state: AccumulateState,
         params: Optional[optax.Params] = None,
         **extra_args: Any,
-    ) -> tuple[optax.Updates, AccumulateOnUpdateState]:
-        skip = skip_if_traced and is_traced(state)
-        if not skip:
-            value = func(
-                state.count,
-                state.value,
-                updates=updates,
-                state=state,
-                params=params,
-                **extra_args,
-            )
-            state = AccumulateOnUpdateState(state.count + 1, value)
-        return updates, state
+    ) -> AccumulateState:
+        return AccumulateState(
+            state.count + 1, accumulate(updates, state, params, **extra_args)
+        )
 
-    return optax.GradientTransformationExtraArgs(init_func, update_func)
+    return inspect_update(_update, _init, skip_if_traced=skip_if_traced)

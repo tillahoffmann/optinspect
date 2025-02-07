@@ -4,70 +4,85 @@ import jax
 from jax.core import Tracer
 import optax
 import os
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, NamedTuple, Optional, Union
 
 
-def make_key_func(key: Union[str, Callable]) -> Callable:
+def make_key_func(key: Union[str, int, Callable]) -> Callable:
     """
-    Create a function to extract a value from a dictionary passed as keyword arguments.
-    """
-    if isinstance(key, str):
-        return lambda **kwargs: kwargs[key]
-    elif callable(key):
-        return key
-    raise ValueError(f"`key` must be a string or callable but got {key}.")
-
-
-def get_skip_if_traced(skip_if_traced: Optional[bool]) -> bool:
-    """
-    Determine if a transformation should be skipped if traced.
-
-    .. warning::
-
-        Whether a transformation is skipped if traced is determined when the transform
-        is `created`, not on a case-by-case basis when it is `applied`.
+    Create a function to extract a value from the arguments of a
+    :cls:`~optax.TransformUpdateExtraArgsFn` function.
 
     Args:
-        skip_if_traced: Whether to skip the transformation if traced. If :code:`None`,
-            skip unless the :code:`INSPECT_IF_TRACED` environment variable is not set.
+        key: :cls:`str` to retrieve an argument by name, :cls:`int` to retrieve a
+            positional argument, or a callable which is returned unchanged.
 
     Returns:
-        :code:`skip_if_traced` if the input is not :code:`None`, otherwise whether the
-        environment variable :code:`INSPECT_IF_TRACED` is not set.
+        to extract a value from the arguments of a
+        :cls:`~optax.TransformUpdateExtraArgsFn` function.
     """
-    if skip_if_traced is None:
-        return "INSPECT_IF_TRACED" not in os.environ
-    return skip_if_traced
+    if isinstance(key, Callable):
+        return key
+    elif isinstance(key, int):
+        return lambda *args, **_: args[key]
+    elif isinstance(key, str):
+
+        def _key_func(
+            updates: optax.Updates,
+            state: optax.OptState,
+            params: Optional[optax.Params] = None,
+            **extra_args: Any,
+        ) -> Any:
+            extra_args.update(
+                {
+                    "updates": updates,
+                    "state": state,
+                    "params": params,
+                }
+            )
+            return extra_args[key]
+
+        return _key_func
+
+    raise ValueError(f"`key` must be a string, integer, or callable, but got `{key}`.")
 
 
-def maybe_skip_if_traced(func: Callable) -> Callable:
+def maybe_skip_update_if_traced(
+    update: optax.TransformUpdateExtraArgsFn = None, *, skip_if_traced: bool
+) -> optax.TransformUpdateExtraArgsFn:
     """
-    Wrap a function with keyword-only argument :code:`skip_if_traced` and normalize it
-    based on its value and the environment variable :code:`INSPECT_IF_TRACED` begin set.
+    Skip an update function if the first :code:`updates` argument is traced depending on
+    :code:`skip_if_traced`.
+
+    Args:
+        update: Update function to wrap.
+        skip_if_traced: Indicates whether to skip the update if traced. If :code:`None`,
+            the update is skipped unless the environment variable
+            :code:`INSPECT_IF_TRACED` is set.
+
+    Returns:
+        Update function that is skipped if the first :code:`updates` argument is traced.
     """
-
-    signature = inspect.signature(func)
-    parameter = signature.parameters.get("skip_if_traced")
-    if parameter is None:
-        raise ValueError(
-            f"Function `{func}` does not have a parameter `skip_if_traced`."
-        )
-    if parameter.kind is not parameter.KEYWORD_ONLY:
-        raise ValueError(
-            f"Parameter `skip_if_traced` of function `{func}` must be keyword-only."
-        )
-    if parameter.default is not parameter.empty:
-        raise ValueError(
-            f"Parameter `skip_if_traced` of function `{func}` must not have a default "
-            "value."
+    if update is None:
+        return functools.partial(
+            maybe_skip_update_if_traced, skip_if_traced=skip_if_traced
         )
 
-    @functools.wraps(func)
-    def _wrapped(*args, skip_if_traced: Optional[bool] = None, **kwargs):
-        skip_if_traced = get_skip_if_traced(skip_if_traced)
-        return func(*args, skip_if_traced=skip_if_traced, **kwargs)
+    @functools.wraps(update)
+    def _wrapped_update(
+        updates: optax.Updates,
+        state: optax.EmptyState,
+        params: Optional[optax.Params] = None,
+        **extra_args: Any,
+    ) -> tuple[optax.Updates, optax.OptState]:
+        nonlocal skip_if_traced
+        if skip_if_traced is None:
+            skip_if_traced = "INSPECT_IF_TRACED" not in os.environ
+        if skip_if_traced and is_traced(updates):
+            return updates, state
+        else:
+            return update(updates, state, params, **extra_args)
 
-    return _wrapped
+    return _wrapped_update
 
 
 def is_traced(*args: Any) -> bool:
@@ -84,85 +99,123 @@ def is_traced(*args: Any) -> bool:
     return any(isinstance(leaf, Tracer) for leaf in leaves)
 
 
-@maybe_skip_if_traced
-def on_update(
-    func: Callable, *, skip_if_traced: bool
+def inspect_update(
+    update: optax.TransformUpdateExtraArgsFn,
+    init: Optional[optax.TransformInitFn] = None,
+    *,
+    skip_if_traced: bool = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
-    Call a pure function without return value and leave the updates unchanged.
+    Call a function and leave updates unchanged.
 
     Args:
-        func: Pure function with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.update` (although only
-            accepting keyword arguments). Any return value is discarded.
-        skip_if_traced: Skip printing if any of the arguments passed to :code`update`
-            are traced.
+        func: Function with the same signature as
+            :meth:`~optax.GradientTransformationExtraArgs.update`, returning the updated
+            inspection state. If no value is returned, it is replaced by an
+            :cls:`~optax.EmptyState`.
+        init: Function with the same signature as
+            :meth:`~optax.GradientTransformationExtraArgs.init` or :code:`None` to
+            initialize with an :cls:`~optax.EmptyState`.
+        skip_if_traced: Skip the :code:`update` function if the :code:`updates`
+            argument is traced.
 
     Returns:
-        Gradient transformation that calls :code:`func` and leaves updates unchanged.
+        Gradient transformation.
     """
 
-    def init(params: optax.Params) -> optax.EmptyState:
-        return optax.EmptyState()
+    _init = init or (lambda _: optax.EmptyState())
 
-    def update(
+    @maybe_skip_update_if_traced(skip_if_traced=skip_if_traced)
+    def _update(
         updates: optax.Updates,
         state: optax.EmptyState,
         params: Optional[optax.Params] = None,
         **extra_args: Any,
     ) -> tuple[optax.Updates, optax.OptState]:
-        skip = skip_if_traced and is_traced(updates, params, extra_args)
-        if not skip:
-            func(updates=updates, params=params, **extra_args)
+        state = update(updates, state, params, **extra_args)
+        if state is None:
+            state = optax.EmptyState()
         return updates, state
 
-    return optax.GradientTransformationExtraArgs(init, update)
+    return optax.GradientTransformationExtraArgs(_init, _update)
 
 
-@maybe_skip_if_traced
-def before_after_update(
+class WrappedState(NamedTuple):
+    """
+    State wrapping another gradient transformation.
+
+    Attributes:
+        inner: State of the wrapped optimizer.
+        outer: Additional state information.
+    """
+
+    inner: optax.OptState
+    outer: optax.OptState
+
+
+def inspect_wrapped(
     inner: optax.GradientTransformationExtraArgs,
-    before: Optional[Callable] = None,
-    after: Optional[Callable] = None,
+    update: optax.TransformUpdateExtraArgsFn,
+    init: Optional[optax.TransformInitFn] = None,
     *,
-    skip_if_traced: bool,
+    skip_if_traced: bool = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
-    Call pure functions without return values before and after applying a
-    transformation.
+    Call a function and leave the updates unchanged.
 
     Args:
-        inner: Gradient transformation to wrap.
-        before: Function to call before applying :code:`inner` with the same signature
-            as :meth:`~optax.GradientTransformationExtraArgs.update` (although only
-            accepting keyword arguments). Any return value is discarded.
-        after: Function to call after applying :code:`inner` with the same signature
-            as :meth:`~optax.GradientTransformationExtraArgs.update` (although only
-            accepting keyword arguments). Any return value is discarded.
-        skip_if_traced: Skip execution of :code:`before` and :code:`after` if the state
-            of :code:`inner` is traced.
+        update: Function with the same signature as
+            :meth:`~optax.GradientTransformationExtraArgs.update` receiving a
+            :cls:`.WrappedState` after the wrapped transformation has been applied. It
+            must return the updated :code:`outer` state. If no value is returned, it is
+            replaced by an :cls:`~optax.EmptyState`.
+        init: Function with the same signature as
+            :meth:`~optax.GradientTransformationExtraArgs.init` or :code:`None` to
+            initialize with a :cls:`.WrappedState` whose :code:`outer` state is
+            :cls:`~optax.EmptyState`.
+        skip_if_traced: Skip the :code:`update` function if the :code:`updates`
+            argument is traced.
 
     Returns:
-        Gradient transformation equivalent to :code:`inner`.
+        Gradient transformation.
     """
-    if before is None and after is None:
-        raise ValueError("At least one of `before` or `after` must be specified.")
 
-    def init(params: optax.Params) -> optax.OptState:
-        return inner.init(params)
+    _init = init or (
+        lambda params: WrappedState(inner.init(params), optax.EmptyState())
+    )
 
-    def update(
+    @maybe_skip_update_if_traced(skip_if_traced=skip_if_traced)
+    def _update(
         updates: optax.Updates,
-        state: optax.OptState,
+        state: WrappedState,
         params: Optional[optax.Params] = None,
         **extra_args: Any,
     ) -> tuple[optax.Updates, optax.OptState]:
-        skip = skip_if_traced and is_traced(state)
-        if not skip and before:
-            before(updates=updates, state=state, params=params, **extra_args)
-        updates, state = inner.update(updates, state, params, **extra_args)
-        if not skip and after:
-            after(updates=updates, state=state, params=params, **extra_args)
-        return updates, state
+        updates, inner_state = inner.update(updates, state.inner, params, **extra_args)
+        state = WrappedState(inner_state, state.outer)
+        outer_state = update(updates, state, params, **extra_args)
+        if outer_state is None:
+            outer_state = optax.EmptyState()
+        return updates, WrappedState(inner_state, outer_state)
 
-    return optax.GradientTransformationExtraArgs(init, update)
+    return optax.GradientTransformationExtraArgs(_init, _update)
+
+
+def frepr(func: Callable) -> str:
+    """
+    Represent a function, including signature, closures, and declaration.
+    """
+    signature = inspect.signature(func)
+    code = func.__code__
+    n_freevars = len(code.co_freevars)
+    if inspect.isfunction(func):
+        kind = "function"
+    else:
+        ValueError(func)  # pragma: no cover
+    parts = [
+        f"{kind} {func.__module__}.{func.__qualname__}{signature}",
+        f"file '{code.co_filename}'",
+        f"line {code.co_firstlineno}",
+        f"{n_freevars} free {'var' if n_freevars == 1 else 'vars'}",
+    ]
+    return f"<{', '.join(parts)}>"
