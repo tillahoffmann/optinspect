@@ -4,7 +4,7 @@ from .accumulate import (
     accumulate_most_recent,
 )
 from .format_and_print import print_before_after_update, print_on_update
-from .trace import get_trace, trace_on_update
+from .trace import get_trace, trace_on_update, trace_wrapped
 from .util import before_after_update, is_traced, on_update
 
 __all__ = [
@@ -18,4 +18,5 @@ __all__ = [
     "print_before_after_update",
     "print_on_update",
     "trace_on_update",
+    "trace_wrapped",
 ]

@@ -40,3 +40,17 @@ def test_trace_duplicate_key() -> None:
     state = optim.update(3.0, state)
     with pytest.raises(ValueError, match="Duplicate name `step 1` in trace."):
         optinspect.get_trace(state)
+
+
+def test_trace_wrapped(
+    value_and_grad_and_params: tuple[Callable, optax.Params],
+) -> None:
+    value_and_grad, params = value_and_grad_and_params
+    optim = optinspect.trace_wrapped(
+        optax.adam(0.1), "nu", key=lambda state, **_: state[0].nu
+    )
+    state = optim.init(params)
+    value, grad = value_and_grad(params)
+    _, state = optim.update(grad, state, params, value=value)
+    trace = optinspect.get_trace(state)
+    assert trace["nu"].shape == params.shape and jnp.all(trace["nu"] > 0)
