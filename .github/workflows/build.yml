@@ -31,6 +31,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Lint code
-        run: black --check .
+        run: make lint
       - name: Run tests
-        run: pytest -v
+        run: make tests
+      - name: Run doctests
+        run: make doctests
+      - name: Build docs
+        run: make docs

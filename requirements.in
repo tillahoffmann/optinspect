@@ -2,3 +2,5 @@
 black
 pytest
 pytest-cov
+sphinx
+sphinx-book-theme
