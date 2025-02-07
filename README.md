@@ -11,6 +11,10 @@
 
 - `accumulate_on_update`: Accumulate updates, parameters, or extra arguments.
 
+## Trace Gradient Information
+
+- `trace_on_update`: Add a traced value to the state.
+
 ## Applying Arbitrary Functions
 
 - `on_update`: Call an arbitrary function.
