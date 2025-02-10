@@ -1,13 +1,12 @@
 import functools
 import jax
+from jax import numpy as jnp
 import optax
 import optinspect
 import pytest
 
 
-@pytest.mark.parametrize("jit", [False, True], ids=["not-jitted", "jitted"])
-@pytest.mark.parametrize("skip_if_traced", [False, True], ids=["skip", "do"])
-@pytest.mark.parametrize(
+mark_transformations = pytest.mark.parametrize(
     "transformation, wrapped",
     [
         (functools.partial(optinspect.print_update, format="value: {value}"), False),
@@ -34,6 +33,11 @@ import pytest
         ),
     ],
 )
+
+
+@pytest.mark.parametrize("jit", [False, True], ids=["not-jitted", "jitted"])
+@pytest.mark.parametrize("skip_if_traced", [False, True], ids=["skip", "do"])
+@mark_transformations
 def test_jit(
     jit: bool, value_and_grad_and_params, transformation, wrapped, skip_if_traced: bool
 ) -> None:
@@ -57,3 +61,39 @@ def test_jit(
         value, grad = value_and_grad(params)
         updates, state = update(grad, state, params, value=value)
         params = optax.apply_updates(params, updates)
+
+
+@mark_transformations
+@pytest.mark.parametrize("jit", [False, True], ids=["not-jitted", "jitted"])
+def test_with_and_without_identical(
+    value_and_grad_and_params, transformation, wrapped, jit
+) -> None:
+    value_and_grad, params = value_and_grad_and_params
+    base_optim = optax.scale_by_adam()
+    base_lr = optax.scale_by_learning_rate(0.01)
+    if wrapped:
+        optim = optax.chain(
+            transformation(base_optim),
+            base_lr,
+        )
+    else:
+        optim = optax.chain(
+            base_optim,
+            transformation(),
+            base_lr,
+        )
+
+    def _run(optim, params):
+        state = optim.init(params)
+        for _ in range(7):
+            value, grad = value_and_grad(params)
+            updates, state = optim.update(grad, state, params, value=value)
+            params = optax.apply_updates(params, updates)
+        return params
+
+    if jit:
+        _run = jax.jit(_run, static_argnames=["optim"])
+
+    params1 = _run(optim, params)
+    params2 = _run(optax.chain(base_optim, base_lr), params)
+    assert jnp.allclose(params1, params2)

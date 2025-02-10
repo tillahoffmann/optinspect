@@ -46,45 +46,6 @@ def make_key_func(key: Union[str, int, Callable]) -> Callable:
     raise ValueError(f"`key` must be a string, integer, or callable, but got `{key}`.")
 
 
-def maybe_skip_update_if_traced(
-    update: optax.TransformUpdateExtraArgsFn = None, *, skip_if_traced: bool
-) -> optax.TransformUpdateExtraArgsFn:
-    """
-    Skip an update function if the first :code:`updates` argument is traced depending on
-    :code:`skip_if_traced`.
-
-    Args:
-        update: Update function to wrap.
-        skip_if_traced: Indicates whether to skip the update if traced. If :code:`None`,
-            the update is skipped unless the environment variable
-            :code:`INSPECT_IF_TRACED` is set.
-
-    Returns:
-        Update function that is skipped if the first :code:`updates` argument is traced.
-    """
-    if update is None:
-        return functools.partial(
-            maybe_skip_update_if_traced, skip_if_traced=skip_if_traced
-        )
-
-    @functools.wraps(update)
-    def _wrapped_update(
-        updates: optax.Updates,
-        state: optax.EmptyState,
-        params: Optional[optax.Params] = None,
-        **extra_args: Any,
-    ) -> tuple[optax.Updates, optax.OptState]:
-        nonlocal skip_if_traced
-        if skip_if_traced is None:
-            skip_if_traced = "INSPECT_IF_TRACED" not in os.environ
-        if skip_if_traced and is_traced(updates):
-            return updates, state
-        else:
-            return update(updates, state, params, **extra_args)
-
-    return _wrapped_update
-
-
 def is_traced(*args: Any) -> bool:
     """
     Check if any of the arguments are traced.

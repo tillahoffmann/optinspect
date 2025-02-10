@@ -2,7 +2,6 @@ import jax
 from jax import numpy as jnp
 import optax
 import optinspect
-from optinspect.util import maybe_skip_update_if_traced
 import os
 import pytest
 import re
@@ -56,7 +55,7 @@ def test_wrapped(value_and_grad_and_params, skip_if_traced: bool) -> None:
         (True, None, True, False),
     ],
 )
-def test_maybe_skip_update_if_traced(
+def test_get_skip(
     jit: bool, skip_if_traced: Optional[bool], env: bool, should_skip: bool
 ) -> None:
     assert (
@@ -65,9 +64,11 @@ def test_maybe_skip_update_if_traced(
 
     x = 3
 
-    @maybe_skip_update_if_traced(skip_if_traced=skip_if_traced)
     def update(updates, state, params=None, **extra_args):
-        return -updates, -state
+        if optinspect.inspect._get_skip(updates, skip_if_traced):
+            return updates, state
+        else:
+            return -updates, -state
 
     if jit:
         update = jax.jit(update)
