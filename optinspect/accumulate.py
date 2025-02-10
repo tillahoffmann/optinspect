@@ -1,7 +1,14 @@
+"""
+The :mod:`~optinspect.accumulate` module implements gradient transformations
+:func:`.accumulate_update` to accumulate updates and :func:`.accumulate_wrapped` to
+accumulate the state of a wrapped gradient transformations.
+"""
+
 import jax
 import optax
 from typing import Any, Callable, NamedTuple, Optional, Union
-from .util import inspect_update, make_key_func
+from .inspect import inspect_update
+from .util import make_key_func
 
 
 def accumulate_cumulative_average(
@@ -68,14 +75,12 @@ def accumulate_most_recent(key: Union[str, Callable] = "updates") -> Callable:
 class AccumulateState(NamedTuple):
     """
     State for accumulating values.
-
-    Attributes:
-        count: Iteration number.
-        value: Accumulated value.
     """
 
     count: int
+    """Iteration number."""
     value: optax.Params
+    """Accumulated value."""
 
 
 def accumulate_update(
@@ -91,13 +96,38 @@ def accumulate_update(
         accumulate: Accumulation function with the same signature as
             :meth:`~optax.GradientTransformationExtraArgs.update`, returning the updated
             accumulated value.
-        init: Callable to initialize the :cls:`.AccumulateState` or :code:`None` to
+        init: Callable to initialize the :class:`.AccumulateState` or :code:`None` to
             initialize with the parameters passed to the :code:`init` function of the
             transformation.
         skip_if_traced: Skip accumulation if the :code:`updates` argument is traced.
 
     Returns:
         Gradient transformation.
+
+    Example:
+        >>> import jax
+        >>> from jax import numpy as jnp
+        >>> import optinspect
+        >>>
+        >>> optim = optinspect.accumulate_update(
+        ...     optinspect.accumulate_cumulative_average("updates")
+        ... )
+        >>> params = 3.0
+        >>> value_and_grad = jax.value_and_grad(jnp.square)
+        >>> state = optim.init(params)
+        >>> value, grad = value_and_grad(params)
+        >>> grad
+        Array(6., dtype=float32, weak_type=True)
+        >>> updates, state = optim.update(grad, state, params, value=value)
+        >>> state
+        AccumulateState(count=1, value=Array(6., dtype=float32, weak_type=True))
+        >>> params = 4.0
+        >>> value, grad = value_and_grad(params)
+        >>> grad
+        Array(8., dtype=float32, weak_type=True)
+        >>> updates, state = optim.update(grad, state, params, value=value)
+        >>> state
+        AccumulateState(count=2, value=Array(7., dtype=float32, weak_type=True))
 
     .. seealso::
 
@@ -117,3 +147,6 @@ def accumulate_update(
         )
 
     return inspect_update(_update, _init, skip_if_traced=skip_if_traced)
+
+
+# TODO: Implement `accumulate_wrapped`.
