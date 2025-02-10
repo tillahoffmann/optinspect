@@ -1,5 +1,7 @@
 -e file:.
 black
+matplotlib
+jupyter
 pytest
 pytest-cov
 sphinx
