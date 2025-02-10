@@ -82,6 +82,7 @@ def print_wrapped(
         >>> updates, state = optim.update(grad, state, params, value=value)
         second moment: 0.036
     """
+    inner = optax.with_extra_args_support(inner)
     return inspect_wrapped(
         inner,
         functools.partial(_format_and_print, format),

@@ -17,8 +17,11 @@ class TraceState(NamedTuple):
     State for tracing values.
     """
 
-    name: str
-    """Unique name of the traced value."""
+    name: dict[str, None]
+    """
+    Unique name of the traced value as a dictionary with a single key because strings
+    are not valid jax types (cf. https://github.com/jax-ml/jax/issues/3045).
+    """
     value: Any
     """Traced value."""
 
@@ -68,7 +71,7 @@ def trace_update(
     key_func = make_key_func(key)
 
     def _init(params: optax.Params) -> TraceState:
-        return TraceState(name, params if init is None else init)
+        return TraceState({name: None}, params if init is None else init)
 
     def _update(
         updates: optax.Updates,
@@ -76,7 +79,9 @@ def trace_update(
         params: Optional[optax.Params] = None,
         **extra_args: Any,
     ) -> tuple[optax.Updates, optax.OptState]:
-        return updates, TraceState(name, key_func(updates, state, params, **extra_args))
+        return updates, TraceState(
+            {name: None}, key_func(updates, state, params, **extra_args)
+        )
 
     return inspect_update(_update, _init, skip_if_traced=skip_if_traced)
 
@@ -128,7 +133,7 @@ def trace_wrapped(
     def _init(params: optax.Params) -> WrappedState:
         inner_state = inner.init(params)
         value = key_func(None, inner_state, params)
-        return WrappedState(inner_state, TraceState(name, value))
+        return WrappedState(inner_state, TraceState({name: None}, value))
 
     def _update(
         updates: optax.Updates,
@@ -136,7 +141,9 @@ def trace_wrapped(
         params: Optional[optax.Params] = None,
         **extra_args: Any,
     ) -> Any:
-        return TraceState(name, key_func(updates, state.inner, params, **extra_args))
+        return TraceState(
+            {name: None}, key_func(updates, state.inner, params, **extra_args)
+        )
 
     return inspect_wrapped(inner, _update, _init, skip_if_traced=skip_if_traced)
 
@@ -160,9 +167,10 @@ def get_trace(state: optax.OptState, name: Optional[Any] = None) -> dict[str, An
     trace = {}
     state: TraceState
     for _, state in all_with_path:
-        if name is not None and name == state.name:
+        (current_name,) = state.name
+        if name is not None and name == current_name:
             return state.value
-        if state.name in trace:
-            raise ValueError(f"Duplicate name `{state.name}` in trace.")
-        trace[state.name] = state.value
+        if current_name in trace:
+            raise ValueError(f"Duplicate name `{current_name}` in trace.")
+        trace[current_name] = state.value
     return trace
