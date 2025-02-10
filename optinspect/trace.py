@@ -1,25 +1,26 @@
+"""
+The :mod:`~optinspect.trace` module implements gradient transformations
+:func:`.trace_update` to trace updates, :func:`.trace_wrapped` to trace the state of a
+wrapped gradient transformation, and :func:`.get_trace` to extract traced values from
+the optimizer state.
+"""
+
 import itertools
 import optax
 from typing import Any, Callable, NamedTuple, Optional, Union
-from .util import (
-    inspect_update,
-    inspect_wrapped,
-    make_key_func,
-    WrappedState,
-)
+from .inspect import inspect_update, inspect_wrapped, WrappedState
+from .util import make_key_func
 
 
 class TraceState(NamedTuple):
     """
     State for tracing values.
-
-    Attributes:
-        name: Unique name of the traced value.
-        value: Traced value.
     """
 
     name: str
+    """Unique name of the traced value."""
     value: Any
+    """Traced value."""
 
 
 def trace_update(
@@ -43,6 +44,26 @@ def trace_update(
 
     Returns:
         Gradient transformation.
+
+    Example:
+        >>> import jax
+        >>> from jax import numpy as jnp
+        >>> import optinspect
+        >>>
+        >>> optim = optinspect.trace_update(
+        ...     "updates_and_value",
+        ...     lambda updates, *args, value, **kwargs: {
+        ...         "updates": updates, "value": value
+        ...     }
+        ... )
+        >>> params = 3.0
+        >>> value_and_grad = jax.value_and_grad(jnp.square)
+        >>> state = optim.init(params)
+        >>> value, grad = value_and_grad(params)
+        >>> updates, state = optim.update(grad, state, params, value=value)
+        >>> optinspect.get_trace(state)
+        {'updates_and_value': {'updates': Array(6., dtype=float32, weak_type=True),
+                               'value': Array(9., dtype=float32, weak_type=True)}}
     """
     key_func = make_key_func(key)
 
@@ -81,13 +102,32 @@ def trace_wrapped(
 
     Returns:
         Gradient transformation.
+
+    Example:
+        >>> import jax
+        >>> from jax import numpy as jnp
+        >>> import optax
+        >>> import optinspect
+        >>>
+        >>> optim = optinspect.trace_wrapped(
+        ...     optax.adam(0.1),
+        ...     "second_moment",
+        ...     lambda _, state, *args, **kwargs: state[0].nu,
+        ... )
+        >>> params = 3.0
+        >>> value_and_grad = jax.value_and_grad(jnp.square)
+        >>> state = optim.init(params)
+        >>> value, grad = value_and_grad(params)
+        >>> updates, state = optim.update(grad, state, params, value=value)
+        >>> optinspect.get_trace(state)
+        {'second_moment': Array(0.036, dtype=float32, weak_type=True)}
     """
     inner = optax.with_extra_args_support(inner)
     key_func = make_key_func(key)
 
     def _init(params: optax.Params) -> WrappedState:
         inner_state = inner.init(params)
-        value = key_func(state=inner_state, params=params)
+        value = key_func(None, inner_state, params)
         return WrappedState(inner_state, TraceState(name, value))
 
     def _update(
@@ -96,17 +136,19 @@ def trace_wrapped(
         params: Optional[optax.Params] = None,
         **extra_args: Any,
     ) -> Any:
-        return TraceState(name, key_func(state.inner))
+        return TraceState(name, key_func(updates, state.inner, params, **extra_args))
 
     return inspect_wrapped(inner, _update, _init, skip_if_traced=skip_if_traced)
 
 
-def get_trace(state: optax.OptState) -> dict[str, Any]:
+def get_trace(state: optax.OptState, name: Optional[Any] = None) -> dict[str, Any]:
     """
     Extract traced values from an optimizer state.
 
     Args:
         state: Optimizer state.
+        name: Name of the state to extract. If specified, return only the requested
+            traced value.
 
     Returns:
         Dictionary mapping names to traced values.
@@ -118,6 +160,8 @@ def get_trace(state: optax.OptState) -> dict[str, Any]:
     trace = {}
     state: TraceState
     for _, state in all_with_path:
+        if name is not None and name == state.name:
+            return state.value
         if state.name in trace:
             raise ValueError(f"Duplicate name `{state.name}` in trace.")
         trace[state.name] = state.value

@@ -24,7 +24,9 @@ optinspect
     ...     optax.clip_by_global_norm(1.0),
     ...     optinspect.trace_update("clipped"),
     ...     optinspect.trace_wrapped(
-    ...         optax.scale_by_adam(), "adam_nu", key=lambda state, **_: state.nu
+    ...         optax.scale_by_adam(),
+    ...         "adam_nu",
+    ...         key=lambda _, state, *args, **kwargs: state.nu,
     ...     ),
     ...     optax.scale_by_learning_rate(0.01),
     ... )
@@ -35,3 +37,7 @@ optinspect
     {'raw': Array(8., dtype=float32, weak_type=True),
      'clipped': Array(1., dtype=float32),
      'adam_nu': Array(0.001, dtype=float32)}
+
+.. toctree::
+
+    interface

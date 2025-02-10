@@ -4,7 +4,7 @@ import jax
 from jax.core import Tracer
 import optax
 import os
-from typing import Any, Callable, NamedTuple, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 
 def make_key_func(key: Union[str, int, Callable]) -> Callable:
@@ -97,108 +97,6 @@ def is_traced(*args: Any) -> bool:
     """
     leaves, _ = jax.tree.flatten(args)
     return any(isinstance(leaf, Tracer) for leaf in leaves)
-
-
-def inspect_update(
-    update: optax.TransformUpdateExtraArgsFn,
-    init: Optional[optax.TransformInitFn] = None,
-    *,
-    skip_if_traced: bool = None,
-) -> optax.GradientTransformationExtraArgs:
-    """
-    Call a function and leave updates unchanged.
-
-    Args:
-        func: Function with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.update`, returning the updated
-            inspection state. If no value is returned, it is replaced by an
-            :cls:`~optax.EmptyState`.
-        init: Function with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.init` or :code:`None` to
-            initialize with an :cls:`~optax.EmptyState`.
-        skip_if_traced: Skip the :code:`update` function if the :code:`updates`
-            argument is traced.
-
-    Returns:
-        Gradient transformation.
-    """
-
-    _init = init or (lambda _: optax.EmptyState())
-
-    @maybe_skip_update_if_traced(skip_if_traced=skip_if_traced)
-    def _update(
-        updates: optax.Updates,
-        state: optax.EmptyState,
-        params: Optional[optax.Params] = None,
-        **extra_args: Any,
-    ) -> tuple[optax.Updates, optax.OptState]:
-        state = update(updates, state, params, **extra_args)
-        if state is None:
-            state = optax.EmptyState()
-        return updates, state
-
-    return optax.GradientTransformationExtraArgs(_init, _update)
-
-
-class WrappedState(NamedTuple):
-    """
-    State wrapping another gradient transformation.
-
-    Attributes:
-        inner: State of the wrapped optimizer.
-        outer: Additional state information.
-    """
-
-    inner: optax.OptState
-    outer: optax.OptState
-
-
-def inspect_wrapped(
-    inner: optax.GradientTransformationExtraArgs,
-    update: optax.TransformUpdateExtraArgsFn,
-    init: Optional[optax.TransformInitFn] = None,
-    *,
-    skip_if_traced: bool = None,
-) -> optax.GradientTransformationExtraArgs:
-    """
-    Call a function and leave the updates unchanged.
-
-    Args:
-        update: Function with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.update` receiving a
-            :cls:`.WrappedState` after the wrapped transformation has been applied. It
-            must return the updated :code:`outer` state. If no value is returned, it is
-            replaced by an :cls:`~optax.EmptyState`.
-        init: Function with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.init` or :code:`None` to
-            initialize with a :cls:`.WrappedState` whose :code:`outer` state is
-            :cls:`~optax.EmptyState`.
-        skip_if_traced: Skip the :code:`update` function if the :code:`updates`
-            argument is traced.
-
-    Returns:
-        Gradient transformation.
-    """
-
-    _init = init or (
-        lambda params: WrappedState(inner.init(params), optax.EmptyState())
-    )
-
-    @maybe_skip_update_if_traced(skip_if_traced=skip_if_traced)
-    def _update(
-        updates: optax.Updates,
-        state: WrappedState,
-        params: Optional[optax.Params] = None,
-        **extra_args: Any,
-    ) -> tuple[optax.Updates, optax.OptState]:
-        updates, inner_state = inner.update(updates, state.inner, params, **extra_args)
-        state = WrappedState(inner_state, state.outer)
-        outer_state = update(updates, state, params, **extra_args)
-        if outer_state is None:
-            outer_state = optax.EmptyState()
-        return updates, WrappedState(inner_state, outer_state)
-
-    return optax.GradientTransformationExtraArgs(_init, _update)
 
 
 def frepr(func: Callable) -> str:
