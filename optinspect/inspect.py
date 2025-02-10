@@ -8,9 +8,19 @@ code is jit-compiled to reduce overheads---your instrumented code will run just 
 when jit-compiled.
 """
 
+import functools
 import optax
+import os
 from typing import Any, NamedTuple, Optional
-from .util import maybe_skip_update_if_traced
+from .util import is_traced
+
+
+def _get_skip(value: Any, skip_if_traced: Optional[bool]) -> bool:
+    if not is_traced(value):
+        return False
+    if skip_if_traced is None:
+        skip_if_traced = "INSPECT_IF_TRACED" not in os.environ
+    return skip_if_traced
 
 
 def inspect_update(
@@ -55,16 +65,16 @@ def inspect_update(
 
     _init = init or (lambda _: optax.EmptyState())
 
-    @maybe_skip_update_if_traced(skip_if_traced=skip_if_traced)
     def _update(
         updates: optax.Updates,
         state: optax.EmptyState,
         params: Optional[optax.Params] = None,
         **extra_args: Any,
     ) -> tuple[optax.Updates, optax.OptState]:
-        state = update(updates, state, params, **extra_args)
-        if state is None:
-            state = optax.EmptyState()
+        if not _get_skip(updates, skip_if_traced):
+            state = update(updates, state, params, **extra_args)
+            if state is None:
+                state = optax.EmptyState()
         return updates, state
 
     return optax.GradientTransformationExtraArgs(_init, _update)
@@ -131,7 +141,6 @@ def inspect_wrapped(
         lambda params: WrappedState(inner.init(params), optax.EmptyState())
     )
 
-    @maybe_skip_update_if_traced(skip_if_traced=skip_if_traced)
     def _update(
         updates: optax.Updates,
         state: WrappedState,
@@ -140,9 +149,11 @@ def inspect_wrapped(
     ) -> tuple[optax.Updates, optax.OptState]:
         updates, inner_state = inner.update(updates, state.inner, params, **extra_args)
         state = WrappedState(inner_state, state.outer)
-        outer_state = update(updates, state, params, **extra_args)
-        if outer_state is None:
-            outer_state = optax.EmptyState()
-        return updates, WrappedState(inner_state, outer_state)
+        if not _get_skip(updates, skip_if_traced):
+            outer_state = update(updates, state, params, **extra_args)
+            if outer_state is None:
+                outer_state = optax.EmptyState()
+            state = WrappedState(inner_state, outer_state)
+        return updates, state
 
     return optax.GradientTransformationExtraArgs(_init, _update)
