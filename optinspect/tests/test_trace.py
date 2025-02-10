@@ -50,10 +50,10 @@ def test_trace_wrapped(
 ) -> None:
     value_and_grad, params = value_and_grad_and_params
     optim = optinspect.trace_wrapped(
-        optax.adam(0.1), "nu", key=lambda _, state, *args, **kwargs: state[0].nu
+        optax.adam(0.1), "mu", key=lambda _, state, *args, **kwargs: state[0].mu
     )
     state = optim.init(params)
     value, grad = value_and_grad(params)
     _, state = optim.update(grad, state, params, value=value)
     trace = optinspect.get_trace(state)
-    assert trace["nu"].shape == params.shape and jnp.all(trace["nu"] > 0)
+    assert jnp.allclose(trace["mu"], state.inner[0].mu)
