@@ -79,9 +79,7 @@ def trace_update(
         params: Optional[optax.Params] = None,
         **extra_args: Any,
     ) -> tuple[optax.Updates, optax.OptState]:
-        return updates, TraceState(
-            {name: None}, key_func(updates, state, params, **extra_args)
-        )
+        return TraceState({name: None}, key_func(updates, state, params, **extra_args))
 
     return inspect_update(_update, _init, skip_if_traced=skip_if_traced)
 
