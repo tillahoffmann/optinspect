@@ -149,4 +149,45 @@ def accumulate_update(
     return inspect_update(_update, _init, skip_if_traced=skip_if_traced)
 
 
+def reset_accumulate_count(state: optax.OptState) -> optax.OptState:
+    """
+    Reset the :code:`count` variable of all :class:`AccumulateState`\\ s.
+
+    Args:
+        state: State to update.
+
+    Returns:
+        State with the :code:`count` variable of :class:`AccumulateState`\\ s reset.
+
+    Example:
+        >>> import jax
+        >>> from jax import numpy as jnp
+        >>> import optinspect
+        >>>
+        >>> optim = optinspect.accumulate_update(
+        ...     optinspect.accumulate_cumulative_average("updates")
+        ... )
+        >>> params = 3.0
+        >>> value_and_grad = jax.value_and_grad(jnp.square)
+        >>> state = optim.init(params)
+        >>> value, grad = value_and_grad(params)
+        >>> updates, state = optim.update(grad, state, params, value=value)
+        >>> updates, state = optim.update(grad, state, params, value=value)
+        >>> state
+        AccumulateState(count=2, value=Array(6., dtype=float32, weak_type=True))
+        >>> state = optinspect.reset_accumulate_count(state)
+        >>> state
+        AccumulateState(count=0, value=Array(6., dtype=float32, weak_type=True))
+    """
+    return optax.tree_utils.tree_set(
+        state,
+        lambda path, _: any(
+            isinstance(part, optax.tree_utils.NamedTupleKey)
+            and part.tuple_name == AccumulateState.__name__
+            for part in path
+        ),
+        count=0,
+    )
+
+
 # TODO: Implement `accumulate_wrapped`.

@@ -45,6 +45,10 @@ def test_accumulate(
         assert state.count == n
         assert jnp.allclose(state.value, expected)
 
+    # Check that resetting works.
+    state = optinspect.reset_accumulate_count(state)
+    assert state.count == 0
+
 
 def test_accumulate_invalid_key() -> None:
     with pytest.raises(ValueError, match="must be a string, integer, or callable"):
