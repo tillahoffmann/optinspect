@@ -2,6 +2,7 @@ from .accumulate import (
     accumulate_cumulative_average,
     accumulate_most_recent,
     accumulate_update,
+    reset_accumulate_count,
 )
 from .format_and_print import print_wrapped, print_update
 from .inspect import inspect_update, inspect_wrapped
@@ -19,6 +20,7 @@ __all__ = [
     "is_traced",
     "print_update",
     "print_wrapped",
+    "reset_accumulate_count",
     "trace_update",
     "trace_wrapped",
 ]
