@@ -2,11 +2,12 @@ from .accumulate import (
     accumulate_cumulative_average,
     accumulate_most_recent,
     accumulate_update,
+    get_accumulated_values,
     reset_accumulate_count,
 )
 from .format_and_print import print_wrapped, print_update
 from .inspect import inspect_update, inspect_wrapped
-from .trace import get_trace, trace_update, trace_wrapped
+from .trace import get_traced_values, trace_update, trace_wrapped
 from .util import frepr, is_traced
 
 __all__ = [
@@ -14,7 +15,8 @@ __all__ = [
     "accumulate_most_recent",
     "accumulate_update",
     "frepr",
-    "get_trace",
+    "get_accumulated_values",
+    "get_traced_values",
     "inspect_update",
     "inspect_wrapped",
     "is_traced",

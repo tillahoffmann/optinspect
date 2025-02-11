@@ -18,7 +18,9 @@ mark_transformations = pytest.mark.parametrize(
         ),
         (
             functools.partial(
-                optinspect.accumulate_update, optinspect.accumulate_cumulative_average()
+                optinspect.accumulate_update,
+                "tag",
+                optinspect.accumulate_cumulative_average(),
             ),
             False,
         ),

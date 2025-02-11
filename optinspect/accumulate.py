@@ -8,6 +8,7 @@ import jax
 import optax
 from typing import Any, Callable, NamedTuple, Optional, Union
 from .inspect import inspect_update
+from .tag import _update_tagged_state, get_tagged_values
 from .util import make_key_func
 
 
@@ -72,11 +73,17 @@ def accumulate_most_recent(key: Union[str, Callable] = "updates") -> Callable:
     return _accumulate
 
 
+@_update_tagged_state
 class AccumulateState(NamedTuple):
     """
     State for accumulating values.
     """
 
+    tag_: dict[str, None]
+    """
+    Unique tag of the traced value as a dictionary with a single key because strings
+    are not valid jax types (cf. https://github.com/jax-ml/jax/issues/3045).
+    """
     count: int
     """Iteration number."""
     value: optax.Params
@@ -84,6 +91,7 @@ class AccumulateState(NamedTuple):
 
 
 def accumulate_update(
+    tag: str,
     accumulate: optax.GradientTransformationExtraArgs,
     init: Optional[optax.TransformInitFn] = None,
     *,
@@ -93,6 +101,7 @@ def accumulate_update(
     Accumulate updates, parameters, or extra arguments.
 
     Args:
+        tag: Tag for the accumulated value.
         accumulate: Accumulation function with the same signature as
             :meth:`~optax.GradientTransformationExtraArgs.update`, returning the updated
             accumulated value.
@@ -110,6 +119,7 @@ def accumulate_update(
         >>> import optinspect
         >>>
         >>> optim = optinspect.accumulate_update(
+        ...     "accumulated_updates",
         ...     optinspect.accumulate_cumulative_average("updates")
         ... )
         >>> params = 3.0
@@ -117,24 +127,24 @@ def accumulate_update(
         >>> state = optim.init(params)
         >>> value, grad = value_and_grad(params)
         >>> grad
-        Array(6., dtype=float32, weak_type=True)
+        Array(6., ...)
         >>> updates, state = optim.update(grad, state, params, value=value)
         >>> state
-        AccumulateState(count=1, value=Array(6., dtype=float32, weak_type=True))
+        AccumulateState(tag='accumulated_updates', count=1, value=Array(6., ...))
         >>> params = 4.0
         >>> value, grad = value_and_grad(params)
         >>> grad
-        Array(8., dtype=float32, weak_type=True)
+        Array(8., ...)
         >>> updates, state = optim.update(grad, state, params, value=value)
         >>> state
-        AccumulateState(count=2, value=Array(7., dtype=float32, weak_type=True))
+        AccumulateState(tag='accumulated_updates', count=2, value=Array(7., ...))
 
     .. seealso::
 
         :func:`.accumulate_cumulative_average`, :func:`.accumulate_most_recent`.
     """
 
-    _init = init or (lambda params: AccumulateState(0, params))
+    _init = init or (lambda params: AccumulateState({tag: None}, 0, params))
 
     def _update(
         updates: optax.Updates,
@@ -143,7 +153,9 @@ def accumulate_update(
         **extra_args: Any,
     ) -> AccumulateState:
         return AccumulateState(
-            state.count + 1, accumulate(updates, state, params, **extra_args)
+            {tag: None},
+            state.count + 1,
+            accumulate(updates, state, params, **extra_args),
         )
 
     return inspect_update(_update, _init, skip_if_traced=skip_if_traced)
@@ -165,6 +177,7 @@ def reset_accumulate_count(state: optax.OptState) -> optax.OptState:
         >>> import optinspect
         >>>
         >>> optim = optinspect.accumulate_update(
+        ...     "accumulated_updates",
         ...     optinspect.accumulate_cumulative_average("updates")
         ... )
         >>> params = 3.0
@@ -174,10 +187,10 @@ def reset_accumulate_count(state: optax.OptState) -> optax.OptState:
         >>> updates, state = optim.update(grad, state, params, value=value)
         >>> updates, state = optim.update(grad, state, params, value=value)
         >>> state
-        AccumulateState(count=2, value=Array(6., dtype=float32, weak_type=True))
+        AccumulateState(tag='accumulated_updates', count=2, value=Array(6., ...))
         >>> state = optinspect.reset_accumulate_count(state)
         >>> state
-        AccumulateState(count=0, value=Array(6., dtype=float32, weak_type=True))
+        AccumulateState(tag='accumulated_updates', count=0, value=Array(6., ...))
     """
     return optax.tree_utils.tree_set(
         state,
@@ -188,6 +201,23 @@ def reset_accumulate_count(state: optax.OptState) -> optax.OptState:
         ),
         count=0,
     )
+
+
+def get_accumulated_values(
+    state: optax.OptState, tag: Optional[Any] = None
+) -> dict[str, Any]:
+    """
+    Extract accumulated values from an optimizer state.
+
+    Args:
+        state: Optimizer state.
+        tag: Tag of the state to extract. If specified, return only the requested
+            accumulated value.
+
+    Returns:
+        Dictionary mapping tag names to accumulated values.
+    """
+    return get_tagged_values(state, tag=tag, tuple_name="AccumulateState")
 
 
 # TODO: Implement `accumulate_wrapped`.

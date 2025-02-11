@@ -23,7 +23,9 @@ def test_accumulate(
 ) -> None:
     n = 10
     x = 4
-    optim = optinspect.accumulate_update(accumulate_func, skip_if_traced=skip_if_traced)
+    optim = optinspect.accumulate_update(
+        "tag", accumulate_func, skip_if_traced=skip_if_traced
+    )
     state = optim.init(x)
 
     if scan:
@@ -44,6 +46,10 @@ def test_accumulate(
             assert jnp.allclose(updated, grad), "Gradient must be unchanged."
         assert state.count == n
         assert jnp.allclose(state.value, expected)
+
+    # Get the traced values.
+    if not skip_if_traced or not scan:
+        assert jnp.allclose(optinspect.get_accumulated_values(state)["tag"], expected)
 
     # Check that resetting works.
     state = optinspect.reset_accumulate_count(state)

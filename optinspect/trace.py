@@ -1,29 +1,30 @@
 """
 The :mod:`~optinspect.trace` module implements gradient transformations
 :func:`.trace_update` to trace updates, :func:`.trace_wrapped` to trace the state of a
-wrapped gradient transformation, and :func:`.get_trace` to extract traced values from
-the optimizer state.
+wrapped gradient transformation, and :func:`.get_traced_values` to extract traced values
+from the optimizer state.
 """
 
-import itertools
 import optax
 from typing import Any, Callable, NamedTuple, Optional, Union
 from .inspect import inspect_update, inspect_wrapped, WrappedState
+from .tag import _update_tagged_state, get_tagged_values
 from .util import make_key_func
 
 
+@_update_tagged_state
 class TraceState(NamedTuple):
     """
     State for tracing values.
     """
 
-    tag: dict[str, None]
+    tag_: dict[str, None]
     """
     Unique tag of the traced value as a dictionary with a single key because strings
     are not valid jax types (cf. https://github.com/jax-ml/jax/issues/3045).
     """
-    value: Any
-    """Traced value."""
+    value: optax.Params
+    """Accumulated value."""
 
 
 def trace_update(
@@ -64,7 +65,7 @@ def trace_update(
         >>> state = optim.init(params)
         >>> value, grad = value_and_grad(params)
         >>> updates, state = optim.update(grad, state, params, value=value)
-        >>> optinspect.get_trace(state)
+        >>> optinspect.get_traced_values(state)
         {'updates_and_value': {'updates': Array(6., dtype=float32, weak_type=True),
                                'value': Array(9., dtype=float32, weak_type=True)}}
     """
@@ -122,7 +123,7 @@ def trace_wrapped(
         >>> state = optim.init(params)
         >>> value, grad = value_and_grad(params)
         >>> updates, state = optim.update(grad, state, params, value=value)
-        >>> optinspect.get_trace(state)
+        >>> optinspect.get_traced_values(state)
         {'second_moment': Array(0.036, dtype=float32, weak_type=True)}
     """
     inner = optax.with_extra_args_support(inner)
@@ -146,7 +147,9 @@ def trace_wrapped(
     return inspect_wrapped(inner, _update, _init, skip_if_traced=skip_if_traced)
 
 
-def get_trace(state: optax.OptState, tag: Optional[Any] = None) -> dict[str, Any]:
+def get_traced_values(
+    state: optax.OptState, tag: Optional[Any] = None
+) -> dict[str, Any]:
     """
     Extract traced values from an optimizer state.
 
@@ -156,19 +159,6 @@ def get_trace(state: optax.OptState, tag: Optional[Any] = None) -> dict[str, Any
             value.
 
     Returns:
-        Dictionary mapping names to traced values.
+        Dictionary mapping tag names to traced values.
     """
-    all_with_path = itertools.chain(
-        optax.tree_utils.tree_get_all_with_path(state, "TraceState"),
-        optax.tree_utils.tree_get_all_with_path(state, "WrapperTraceState"),
-    )
-    trace = {}
-    state: TraceState
-    for _, state in all_with_path:
-        (current_tag,) = state.tag
-        if tag is not None and tag == current_tag:
-            return state.value
-        if current_tag in trace:
-            raise ValueError(f"Duplicate tag `{current_tag}` in trace.")
-        trace[current_tag] = state.value
-    return trace
+    return get_tagged_values(state, tag=tag, tuple_name="TraceState")
