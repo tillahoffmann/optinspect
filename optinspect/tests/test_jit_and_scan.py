@@ -26,7 +26,7 @@ mark_transformations = pytest.mark.parametrize(
         (
             functools.partial(
                 optinspect.trace_wrapped,
-                name="nu",
+                tag="nu",
                 key=lambda _, state, *args, **kwargs: state.nu,
             ),
             True,

@@ -17,9 +17,9 @@ class TraceState(NamedTuple):
     State for tracing values.
     """
 
-    name: dict[str, None]
+    tag: dict[str, None]
     """
-    Unique name of the traced value as a dictionary with a single key because strings
+    Unique tag of the traced value as a dictionary with a single key because strings
     are not valid jax types (cf. https://github.com/jax-ml/jax/issues/3045).
     """
     value: Any
@@ -27,7 +27,7 @@ class TraceState(NamedTuple):
 
 
 def trace_update(
-    name: str,
+    tag: str,
     key: Union[str, Callable] = "updates",
     init: Any = None,
     *,
@@ -37,7 +37,7 @@ def trace_update(
     Trace a gradient update.
 
     Args:
-        name: Name of the traced state.
+        tag: Tag for the traced state.
         key: Quantity to trace. If a callable with the same signature as
             :meth:`~optax.GradientTransformationExtraArgs.update`, trace the
             returned value. If a string, trace arguments by name. If an integer,
@@ -71,7 +71,7 @@ def trace_update(
     key_func = make_key_func(key)
 
     def _init(params: optax.Params) -> TraceState:
-        return TraceState({name: None}, params if init is None else init)
+        return TraceState({tag: None}, params if init is None else init)
 
     def _update(
         updates: optax.Updates,
@@ -79,14 +79,14 @@ def trace_update(
         params: Optional[optax.Params] = None,
         **extra_args: Any,
     ) -> tuple[optax.Updates, optax.OptState]:
-        return TraceState({name: None}, key_func(updates, state, params, **extra_args))
+        return TraceState({tag: None}, key_func(updates, state, params, **extra_args))
 
     return inspect_update(_update, _init, skip_if_traced=skip_if_traced)
 
 
 def trace_wrapped(
     inner: optax.GradientTransformation,
-    name: str,
+    tag: str,
     key: Union[str, Callable] = "updates",
     *,
     skip_if_traced: bool = None,
@@ -96,7 +96,7 @@ def trace_wrapped(
 
     Args:
         inner: Gradient transformation to wrap.
-        name: Name of the traced state.
+        tag: Tag for the traced state.
         key: Quantity to trace. If a callable with the same signature as
             :meth:`~optax.GradientTransformationExtraArgs.update`, trace the
             returned value. If a string, trace arguments by name. If an integer,
@@ -131,7 +131,7 @@ def trace_wrapped(
     def _init(params: optax.Params) -> WrappedState:
         inner_state = inner.init(params)
         value = key_func(None, inner_state, params)
-        return WrappedState(inner_state, TraceState({name: None}, value))
+        return WrappedState(inner_state, TraceState({tag: None}, value))
 
     def _update(
         updates: optax.Updates,
@@ -140,20 +140,20 @@ def trace_wrapped(
         **extra_args: Any,
     ) -> Any:
         return TraceState(
-            {name: None}, key_func(updates, state.inner, params, **extra_args)
+            {tag: None}, key_func(updates, state.inner, params, **extra_args)
         )
 
     return inspect_wrapped(inner, _update, _init, skip_if_traced=skip_if_traced)
 
 
-def get_trace(state: optax.OptState, name: Optional[Any] = None) -> dict[str, Any]:
+def get_trace(state: optax.OptState, tag: Optional[Any] = None) -> dict[str, Any]:
     """
     Extract traced values from an optimizer state.
 
     Args:
         state: Optimizer state.
-        name: Name of the state to extract. If specified, return only the requested
-            traced value.
+        tag: Tag of the state to extract. If specified, return only the requested traced
+            value.
 
     Returns:
         Dictionary mapping names to traced values.
@@ -165,10 +165,10 @@ def get_trace(state: optax.OptState, name: Optional[Any] = None) -> dict[str, An
     trace = {}
     state: TraceState
     for _, state in all_with_path:
-        (current_name,) = state.name
-        if name is not None and name == current_name:
+        (current_tag,) = state.tag
+        if tag is not None and tag == current_tag:
             return state.value
-        if current_name in trace:
-            raise ValueError(f"Duplicate name `{current_name}` in trace.")
-        trace[current_name] = state.value
+        if current_tag in trace:
+            raise ValueError(f"Duplicate tag `{current_tag}` in trace.")
+        trace[current_tag] = state.value
     return trace

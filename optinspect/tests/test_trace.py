@@ -41,7 +41,7 @@ def test_trace_duplicate_key() -> None:
     )
     state = optim.init(4.0)
     state = optim.update(3.0, state)
-    with pytest.raises(ValueError, match="Duplicate name `step 1` in trace."):
+    with pytest.raises(ValueError, match="Duplicate tag `step 1` in trace."):
         optinspect.get_trace(state)
 
 
