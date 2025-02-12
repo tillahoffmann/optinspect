@@ -8,15 +8,15 @@ from typing import Any, Callable, Optional, Union
 def make_key_func(key: Union[str, int, Callable]) -> Callable:
     """
     Create a function to extract a value from the arguments of a
-    :cls:`~optax.TransformUpdateExtraArgsFn` function.
+    :class:`~optax.TransformUpdateExtraArgsFn` function.
 
     Args:
-        key: :cls:`str` to retrieve an argument by name, :cls:`int` to retrieve a
+        key: :class:`str` to retrieve an argument by name, :class:`int` to retrieve a
             positional argument, or a callable which is returned unchanged.
 
     Returns:
         Function to extract a value from the arguments of a
-        :cls:`~optax.TransformUpdateExtraArgsFn` function.
+        :class:`~optax.TransformUpdateExtraArgsFn` function.
     """
     if callable(key):
         return key
@@ -53,6 +53,15 @@ def is_traced(*args: Any) -> bool:
 
     Returns:
         :code:`True` if any of the arguments are traced, otherwise :code:`False`.
+
+    Example:
+        >>> import jax
+        >>> import optinspect
+        >>>
+        >>> optinspect.is_traced({"a": 3})
+        False
+        >>> jax.jit(optinspect.is_traced)({"a": 3})
+        Array(True, ...)
     """
     leaves, _ = jax.tree.flatten(args)
     return any(isinstance(leaf, Tracer) for leaf in leaves)
