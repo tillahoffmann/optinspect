@@ -1,5 +1,6 @@
 import jax
 from jax import numpy as jnp
+import optax
 import optinspect
 import pytest
 from typing import Any, Callable
@@ -18,7 +19,7 @@ from typing import Any, Callable
     ],
 )
 @pytest.mark.parametrize("scan", [False, True], ids=["loop", "scan"])
-def test_accumulate(
+def test_accumulate_update(
     accumulate_func: Callable, expected: Any, skip_if_traced: bool, scan: bool
 ) -> None:
     n = 10
@@ -54,6 +55,27 @@ def test_accumulate(
     # Check that resetting works.
     state = optinspect.reset_accumulate_count(state)
     assert state.count == 0
+
+
+def test_accumulate_wrapped() -> None:
+    optim = optinspect.accumulate_wrapped(
+        optax.adam(0.1),
+        "mu",
+        optinspect.accumulate_cumulative_average(
+            lambda _, state, *args, **kwargs: state.inner[0].mu
+        ),
+    )
+    state = optim.init(3.0)
+
+    expected = 0
+    n = 5
+    for grad in jnp.arange(n):
+        _, state = optim.update(grad, state)
+        expected += state.inner[0].mu
+
+    expected /= n
+    actual = optinspect.get_accumulated_values(state, "mu")
+    assert jnp.allclose(actual, expected)
 
 
 def test_accumulate_invalid_key() -> None:

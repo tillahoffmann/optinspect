@@ -2,6 +2,7 @@ from .accumulate import (
     accumulate_cumulative_average,
     accumulate_most_recent,
     accumulate_update,
+    accumulate_wrapped,
     get_accumulated_values,
     reset_accumulate_count,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "accumulate_cumulative_average",
     "accumulate_most_recent",
     "accumulate_update",
+    "accumulate_wrapped",
     "frepr",
     "get_accumulated_values",
     "get_traced_values",
