@@ -32,7 +32,7 @@ def trace_update(
     key: Union[str, int, Callable] = "updates",
     init: Any = None,
     *,
-    skip_if_traced: bool = None,
+    skip_if_traced: Optional[bool] = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
     Trace a gradient update.
@@ -90,7 +90,7 @@ def trace_wrapped(
     tag: str,
     key: Union[str, int, Callable] = "updates",
     *,
-    skip_if_traced: bool = None,
+    skip_if_traced: Optional[bool] = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
     Trace the state of a wrapped gradient transformation after an update.

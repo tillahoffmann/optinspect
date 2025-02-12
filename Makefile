@@ -14,3 +14,5 @@ tests :
 
 lint:
 	black --check .
+	flake8 optinspect
+	mypy --ignore-missing-imports optinspect

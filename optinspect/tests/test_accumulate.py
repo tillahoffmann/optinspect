@@ -66,7 +66,7 @@ def test_accumulate_wrapped() -> None:
     )
     state = optim.init(3.0)
 
-    expected = 0
+    expected = 0.0
     n = 5
     for grad in jnp.arange(n):
         _, state = optim.update(grad, state)
@@ -74,4 +74,4 @@ def test_accumulate_wrapped() -> None:
 
     expected /= n
     actual = optinspect.get_accumulated_values(state, "mu")
-    assert jnp.allclose(actual, expected)
+    assert jnp.allclose(actual, expected)  # type: ignore

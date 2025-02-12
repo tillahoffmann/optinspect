@@ -23,7 +23,7 @@ class AccumulateState(NamedTuple):
     Unique tag of the traced value as a dictionary with a single key because strings
     are not valid jax types (cf. https://github.com/jax-ml/jax/issues/3045).
     """
-    count: int
+    count: int  # type: ignore[assignment]
     """Iteration number."""
     value: optax.Params
     """Accumulated value."""
@@ -88,7 +88,7 @@ def accumulate_update(
     key: Union[str, int, Callable] = "updates",
     init: Optional[optax.TransformInitFn] = None,
     *,
-    skip_if_traced: bool = None,
+    skip_if_traced: Optional[bool] = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
     Accumulate updates, parameters, or extra arguments.
@@ -200,7 +200,7 @@ def reset_accumulate_count(state: optax.OptState) -> optax.OptState:
 
 def get_accumulated_values(
     state: optax.OptState, tag: Optional[Any] = None
-) -> dict[str, Any]:
+) -> Union[dict[str, Any], Any]:
     """
     Extract accumulated values from an optimizer state.
 
@@ -221,7 +221,7 @@ def accumulate_wrapped(
     accumulate: optax.GradientTransformationExtraArgs,
     key: Union[str, int, Callable] = "updates",
     *,
-    skip_if_traced: bool = None,
+    skip_if_traced: Optional[bool] = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
     Accumulate the state of a wrapped gradient transformation after an update.

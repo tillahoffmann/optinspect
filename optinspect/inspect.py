@@ -26,7 +26,7 @@ def inspect_update(
     update: optax.TransformUpdateExtraArgsFn,
     init: Optional[optax.TransformInitFn] = None,
     *,
-    skip_if_traced: bool = None,
+    skip_if_traced: Optional[bool] = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
     Call a function and leave updates unchanged.
@@ -96,7 +96,7 @@ def inspect_wrapped(
     update: optax.TransformUpdateExtraArgsFn,
     init: Optional[Callable] = None,
     *,
-    skip_if_traced: bool = None,
+    skip_if_traced: Optional[bool] = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
     Call a function and leave the updates unchanged.

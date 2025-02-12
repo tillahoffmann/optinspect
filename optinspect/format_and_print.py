@@ -6,7 +6,7 @@ a wrapped gradient transformation for quick debugging.
 
 import functools
 import optax
-from typing import Any
+from typing import Any, Optional
 from .inspect import inspect_wrapped, inspect_update
 
 
@@ -17,7 +17,7 @@ def _format_and_print(format: str, *args: Any, **kwargs: Any) -> None:
 
 
 def print_update(
-    format: str, *, skip_if_traced: bool = None
+    format: str, *, skip_if_traced: Optional[bool] = None
 ) -> optax.GradientTransformationExtraArgs:
     """
     Print updates, parameters, or extra arguments.
@@ -52,7 +52,7 @@ def print_wrapped(
     inner: optax.GradientTransformation,
     format: str,
     *,
-    skip_if_traced: bool = None,
+    skip_if_traced: Optional[bool] = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
     Print state information after an update.

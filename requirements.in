@@ -1,6 +1,8 @@
 -e file:.
 black
+flake8
 matplotlib
+mypy
 jupyter
 pytest
 pytest-cov

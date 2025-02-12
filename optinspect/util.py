@@ -15,10 +15,10 @@ def make_key_func(key: Union[str, int, Callable]) -> Callable:
             positional argument, or a callable which is returned unchanged.
 
     Returns:
-        to extract a value from the arguments of a
+        Function to extract a value from the arguments of a
         :cls:`~optax.TransformUpdateExtraArgsFn` function.
     """
-    if isinstance(key, Callable):
+    if callable(key):
         return key
     elif isinstance(key, int):
         return lambda *args, **_: args[key]
