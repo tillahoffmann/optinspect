@@ -135,7 +135,7 @@ def inspect_wrapped(
                          mu=Array(0.6, dtype=float32, weak_type=True),
                          nu=Array(0.036, dtype=float32, weak_type=True))
     """
-
+    inner = optax.with_extra_args_support(inner)
     _init = init or (
         lambda params: WrappedState(inner.init(params), optax.EmptyState())
     )

@@ -126,7 +126,6 @@ def trace_wrapped(
         >>> optinspect.get_traced_values(state)
         {'second_moment': Array(0.036, dtype=float32, weak_type=True)}
     """
-    inner = optax.with_extra_args_support(inner)
     key_func = make_key_func(key)
 
     def _init(params: optax.Params) -> WrappedState:
