@@ -10,7 +10,7 @@ when jit-compiled.
 
 import optax
 import os
-from typing import Any, NamedTuple, Optional
+from typing import Any, Callable, NamedTuple, Optional
 from .util import is_traced
 
 
@@ -33,8 +33,9 @@ def inspect_update(
 
     Args:
         func: Function with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.update`, returning the updated
-            inspection state. If no value is returned, it is replaced by an
+            :meth:`~optax.GradientTransformationExtraArgs.update`. It must accept an
+            inspection state for its second :code:`state` argument and return the
+            updated inspection state. If no value is returned, it is replaced by an
             :class:`~optax.EmptyState`.
         init: Function with the same signature as
             :meth:`~optax.GradientTransformationExtraArgs.init` or :code:`None` to
@@ -93,7 +94,7 @@ class WrappedState(NamedTuple):
 def inspect_wrapped(
     inner: optax.GradientTransformationExtraArgs,
     update: optax.TransformUpdateExtraArgsFn,
-    init: Optional[optax.TransformInitFn] = None,
+    init: Optional[Callable] = None,
     *,
     skip_if_traced: bool = None,
 ) -> optax.GradientTransformationExtraArgs:
@@ -102,13 +103,15 @@ def inspect_wrapped(
 
     Args:
         update: Function with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.update` receiving a
-            :class:`.WrappedState` after the wrapped transformation has been applied. It
-            must return the updated :code:`outer` state. If no value is returned, it is
-            replaced by an :class:`~optax.EmptyState`.
-        init: Function with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.init` or :code:`None` to
-            initialize with a :class:`.WrappedState` whose :code:`outer` state is
+            :meth:`~optax.GradientTransformationExtraArgs.update`. For the second
+            :code:`state` argument, it must accept a :class:`.WrappedState` comprising
+            the updated :code:`inner` state of the wrapped transformation and the
+            previous :code:`outer` inspection state. It must return the updated
+            inspection state. If no value is returned, it is replaced by an
+            :class:`~optax.EmptyState`.
+        init: Function accepting parameter values and the initial state of the wrapped
+            transformation. It must return the :code:`outer` inspection state of a
+            :class:`.WrappedState`. If :code:`None`, the inspection state is an
             :class:`~optax.EmptyState`.
         skip_if_traced: Skip the :code:`update` function if the :code:`updates`
             argument is traced.
@@ -136,9 +139,14 @@ def inspect_wrapped(
                          nu=Array(0.036, dtype=float32, weak_type=True))
     """
     inner = optax.with_extra_args_support(inner)
-    _init = init or (
-        lambda params: WrappedState(inner.init(params), optax.EmptyState())
-    )
+
+    def _init(params: optax.Params) -> WrappedState:
+        inner_state = inner.init(params)
+        if init is None:
+            outer_state = optax.EmptyState()
+        else:
+            outer_state = init(params, inner_state)
+        return WrappedState(inner_state, outer_state)
 
     def _update(
         updates: optax.Updates,

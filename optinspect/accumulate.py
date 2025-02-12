@@ -281,12 +281,8 @@ def accumulate_wrapped(
         :func:`.accumulate_cumulative_average`, :func:`.accumulate_most_recent`.
     """
 
-    def _init(params: optax.Params) -> WrappedState:
-        inner_state = inner.init(params)
-        outer_state = AccumulateState({tag: None}, 0, params)
-        value = accumulate(None, WrappedState(inner_state, outer_state), params)
-        outer_state = AccumulateState({tag: None}, 0, value)
-        return WrappedState(inner_state, AccumulateState({tag: None}, 0, value))
+    def _init(params: optax.Params, inner_state) -> AccumulateState:
+        return AccumulateState({tag: None}, 0, params)
 
     def _update(
         updates: optax.Updates,

@@ -100,7 +100,8 @@ def trace_wrapped(
         tag: Tag for the traced state.
         key: Quantity to trace. If a callable with the same signature as
             :meth:`~optax.GradientTransformationExtraArgs.update`, trace the
-            returned value. If a string, trace arguments by name. If an integer,
+            returned value. The second :code:`state` argument is the state of the
+            wrapped transformation. If a string, trace arguments by name. If an integer,
             trace arguments by their position.
         skip_if_traced: Skip if the state passed to :code`update` is traced.
 
@@ -128,10 +129,9 @@ def trace_wrapped(
     """
     key_func = make_key_func(key)
 
-    def _init(params: optax.Params) -> WrappedState:
-        inner_state = inner.init(params)
+    def _init(params: optax.Params, inner_state: optax.OptState) -> TraceState:
         value = key_func(None, inner_state, params)
-        return WrappedState(inner_state, TraceState({tag: None}, value))
+        return TraceState({tag: None}, value)
 
     def _update(
         updates: optax.Updates,
