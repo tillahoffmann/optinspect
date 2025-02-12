@@ -58,9 +58,25 @@ def is_traced(*args: Any) -> bool:
     return any(isinstance(leaf, Tracer) for leaf in leaves)
 
 
-def frepr(func: Callable) -> str:
+def func_repr(func: Callable, freevars: bool = True) -> str:
     """
     Represent a function, including signature, closures, and declaration.
+
+    Args:
+        func: Function to represent.
+        freevars: Include values of free variables from the closure.
+
+    Returns:
+        Verbose representation of :code:`func`.
+
+    Example:
+        >>> import optax
+        >>> import optinspect
+        >>>
+        >>> optinspect.func_repr(optax.scale_by_adam(0.02).update)
+        "<function ...update_fn(updates, state, params=None),
+          file '.../transform.py', line ...,
+          free vars: {'b1': 0.02, 'b2': 0.999, 'eps': 1e-08, ...}>"
     """
     signature = inspect.signature(func)
     code = func.__code__
@@ -73,6 +89,13 @@ def frepr(func: Callable) -> str:
         f"{kind} {func.__module__}.{func.__qualname__}{signature}",
         f"file '{code.co_filename}'",
         f"line {code.co_firstlineno}",
-        f"{n_freevars} free {'var' if n_freevars == 1 else 'vars'}",
     ]
+    if freevars and func.__closure__:
+        values = {
+            key: cell.cell_contents
+            for key, cell in zip(code.co_freevars, func.__closure__)
+        }
+        parts.append(f"free {'var' if n_freevars == 1 else 'vars'}: {values}")
+    else:
+        parts.append(f"{n_freevars} free {'var' if n_freevars == 1 else 'vars'}")
     return f"<{', '.join(parts)}>"

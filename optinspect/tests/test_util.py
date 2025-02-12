@@ -86,10 +86,16 @@ def test_get_skip(
 
 def test_frepr() -> None:
     a = 3
-    actual = optinspect.frepr(lambda x: a + x)
+    actual = optinspect.func_repr(lambda x: a + x, freevars=False)
     assert re.match(
         r"<function optinspect\.tests\.test_util\.test_frepr\.<locals>\.<lambda>\(x\), "
         r"file '.*?optinspect/tests/test_util\.py', line \d+, 1 free var>",
+        actual,
+    )
+    actual = optinspect.func_repr(lambda x: a + x)
+    assert re.match(
+        r"<function optinspect\.tests\.test_util\.test_frepr\.<locals>\.<lambda>\(x\), "
+        r"file '.*?optinspect/tests/test_util\.py', line \d+, free var: {'a': 3}>",
         actual,
     )
 
