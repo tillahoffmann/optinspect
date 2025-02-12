@@ -11,7 +11,7 @@ doctests :
 	sphinx-build -b doctest docs docs/_build
 
 tests :
-	pytest -v --cov=optinspect --cov-report=term-missing
+	pytest -v --cov=optinspect --cov-report=term-missing --doctest-modules
 
 lint:
 	black --check .
