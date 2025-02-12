@@ -9,7 +9,7 @@ from .accumulate import (
 from .format_and_print import print_wrapped, print_update
 from .inspect import inspect_update, inspect_wrapped
 from .trace import get_traced_values, trace_update, trace_wrapped
-from .util import func_repr, is_traced, tree_get, tree_set, with_tree_set
+from .util import func_repr, is_traced, tree_get, tree_set, with_tree_get, with_tree_set
 
 __all__ = [
     "accumulate_cumulative_average",
@@ -29,5 +29,6 @@ __all__ = [
     "trace_wrapped",
     "tree_get",
     "tree_set",
+    "with_tree_get",
     "with_tree_set",
 ]
