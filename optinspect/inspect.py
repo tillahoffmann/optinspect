@@ -8,7 +8,6 @@ code is jit-compiled to reduce overheads---your instrumented code will run just 
 when jit-compiled.
 """
 
-import functools
 import optax
 import os
 from typing import Any, NamedTuple, Optional
