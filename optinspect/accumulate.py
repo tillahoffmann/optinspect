@@ -6,71 +6,10 @@ accumulate the state of a wrapped gradient transformations.
 
 import jax
 import optax
-from typing import Any, Callable, NamedTuple, Optional, Union
-from .inspect import inspect_update
+from typing import Any, Callable, NamedTuple, Optional, Protocol, Union
+from .inspect import inspect_update, inspect_wrapped, WrappedState
 from .tag import _update_tagged_state, get_tagged_values
 from .util import make_key_func
-
-
-def accumulate_cumulative_average(
-    key: Union[str, Callable] = "updates",
-    period: Optional[int] = None,
-) -> Callable:
-    """
-    Accumulate the cumulative average.
-
-    Args:
-        key: Quantity to accumulate. If a callable with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.update`, accumulate the
-            returned value. If a string, accumulate arguments by name. If an integer,
-            accumulate arguments by their position.
-        period: Period after which the cumulative average resets.
-
-    Returns:
-        Accumulator function.
-    """
-    key_func = make_key_func(key)
-
-    def _accumulate(
-        updates: optax.Updates,
-        state: AccumulateState,
-        params: Optional[optax.Params] = None,
-        **extra_args: Any,
-    ) -> Any:
-        step = state.count % period if period else state.count
-        return jax.tree.map(
-            lambda old, new: (step * old + new) / (step + 1),
-            state.value,
-            key_func(updates, state, params, **extra_args),
-        )
-
-    return _accumulate
-
-
-def accumulate_most_recent(key: Union[str, Callable] = "updates") -> Callable:
-    """
-    Accumulate the most recent value.
-
-    Args:
-        key: Quantity to accumulate. If a callable with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.update`, accumulate the
-            returned value. If a string, accumulate arguments by name. If an integer,
-            accumulate arguments by their position.
-
-    Returns:
-        Accumulator function.
-    """
-    key_func = make_key_func(key)
-
-    def _accumulate(
-        updates: optax.Updates,
-        state: AccumulateState,
-        params: Optional[optax.Params] = None,
-        **extra_args: Any,
-    ) -> optax.Params:
-        return key_func(updates, state, params, **extra_args)
-
-    return _accumulate
 
 
 @_update_tagged_state
@@ -84,27 +23,79 @@ class AccumulateState(NamedTuple):
     Unique tag of the traced value as a dictionary with a single key because strings
     are not valid jax types (cf. https://github.com/jax-ml/jax/issues/3045).
     """
-    count: int
+    count: int  # type: ignore[assignment]
     """Iteration number."""
     value: optax.Params
     """Accumulated value."""
 
 
+class AccumulateFn(Protocol):
+    """
+    A function to accumulate values from the current state and a new value.
+    """
+
+    def __call__(self, state: AccumulateState, value: Any) -> Any:
+        """
+        Evaluate the new accumulated value.
+
+        Args:
+            state: Current accumulator state.
+            value: New value.
+
+        Returns:
+            New accumulated value.
+        """
+        pass  # pragma: no cover
+
+
+def accumulate_cumulative_average(period: Optional[int] = None) -> AccumulateFn:
+    """
+    Accumulate the cumulative average.
+
+    Args:
+        period: Period after which the cumulative average resets.
+
+    Returns:
+        Accumulator function.
+    """
+
+    def _accumulate(state: AccumulateState, value: Any) -> Any:
+        step = state.count % period if period else state.count
+        return jax.tree.map(
+            lambda old, new: (step * old + new) / (step + 1), state.value, value
+        )
+
+    return _accumulate
+
+
+def accumulate_most_recent() -> AccumulateFn:
+    """
+    Accumulate the most recent value.
+
+    Returns:
+        Accumulator function.
+    """
+
+    def _accumulate(state: AccumulateState, value: Any) -> Any:
+        return value
+
+    return _accumulate
+
+
 def accumulate_update(
     tag: str,
-    accumulate: optax.GradientTransformationExtraArgs,
+    accumulate: AccumulateFn,
+    key: Union[str, int, Callable] = "updates",
     init: Optional[optax.TransformInitFn] = None,
     *,
-    skip_if_traced: bool = None,
+    skip_if_traced: Optional[bool] = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
     Accumulate updates, parameters, or extra arguments.
 
     Args:
         tag: Tag for the accumulated value.
-        accumulate: Accumulation function with the same signature as
-            :meth:`~optax.GradientTransformationExtraArgs.update`, returning the updated
-            accumulated value.
+        accumulate: Accumulator function.
         init: Callable to initialize the :class:`.AccumulateState` or :code:`None` to
             initialize with the parameters passed to the :code:`init` function of the
             transformation.
@@ -119,8 +110,9 @@ def accumulate_update(
         >>> import optinspect
         >>>
         >>> optim = optinspect.accumulate_update(
-        ...     "accumulated_updates",
-        ...     optinspect.accumulate_cumulative_average("updates")
+        ...     tag="accumulated_updates",
+        ...     accumulate=optinspect.accumulate_cumulative_average(),
+        ...     key="updates",
         ... )
         >>> params = 3.0
         >>> value_and_grad = jax.value_and_grad(jnp.square)
@@ -143,8 +135,10 @@ def accumulate_update(
 
         :func:`.accumulate_cumulative_average`, :func:`.accumulate_most_recent`.
     """
+    key_func = make_key_func(key)
 
-    _init = init or (lambda params: AccumulateState({tag: None}, 0, params))
+    def _init(params: optax.Params) -> AccumulateState:
+        return AccumulateState({tag: None}, 0, params if init is None else init(params))
 
     def _update(
         updates: optax.Updates,
@@ -155,7 +149,7 @@ def accumulate_update(
         return AccumulateState(
             {tag: None},
             state.count + 1,
-            accumulate(updates, state, params, **extra_args),
+            accumulate(state, key_func(updates, state, params, **extra_args)),
         )
 
     return inspect_update(_update, _init, skip_if_traced=skip_if_traced)
@@ -177,8 +171,9 @@ def reset_accumulate_count(state: optax.OptState) -> optax.OptState:
         >>> import optinspect
         >>>
         >>> optim = optinspect.accumulate_update(
-        ...     "accumulated_updates",
-        ...     optinspect.accumulate_cumulative_average("updates")
+        ...     tag="accumulated_updates",
+        ...     accumulate=optinspect.accumulate_cumulative_average(),
+        ...     key="updates",
         ... )
         >>> params = 3.0
         >>> value_and_grad = jax.value_and_grad(jnp.square)
@@ -205,7 +200,7 @@ def reset_accumulate_count(state: optax.OptState) -> optax.OptState:
 
 def get_accumulated_values(
     state: optax.OptState, tag: Optional[Any] = None
-) -> dict[str, Any]:
+) -> Union[dict[str, Any], Any]:
     """
     Extract accumulated values from an optimizer state.
 
@@ -220,4 +215,75 @@ def get_accumulated_values(
     return get_tagged_values(state, tag=tag, tuple_name="AccumulateState")
 
 
-# TODO: Implement `accumulate_wrapped`.
+def accumulate_wrapped(
+    inner: optax.GradientTransformation,
+    tag: str,
+    accumulate: optax.GradientTransformationExtraArgs,
+    key: Union[str, int, Callable] = "updates",
+    *,
+    skip_if_traced: Optional[bool] = None,
+) -> optax.GradientTransformationExtraArgs:
+    """
+    Accumulate the state of a wrapped gradient transformation after an update.
+
+    Args:
+        inner: Gradient transformation to wrap.
+        tag: Tag for the accumulated value.
+        accumulate: Accumulation function with the same signature as
+            :meth:`~optax.GradientTransformationExtraArgs.update`, returning the updated
+            accumulated value.
+        skip_if_traced: Skip accumulation if the :code:`updates` argument is traced.
+
+    Returns:
+        Gradient transformation.
+
+    Example:
+        >>> import jax
+        >>> from jax import numpy as jnp
+        >>> import optinspect
+        >>>
+        >>> optim = optinspect.accumulate_wrapped(
+        ...     inner=optax.adam(1e-3),
+        ...     tag="second_moment",
+        ...     accumulate=optinspect.accumulate_cumulative_average(),
+        ...     key=lambda _, state, *args, **kwargs: state[0].nu
+        ... )
+        >>> params = 3.0
+        >>> value_and_grad = jax.value_and_grad(jnp.square)
+        >>> state = optim.init(params)
+        >>> value, grad = value_and_grad(params)
+        >>> grad
+        Array(6., ...)
+        >>> updates, state = optim.update(grad, state, params, value=value)
+        >>> state
+        WrappedState(inner=(ScaleByAdamState(count=Array(1, ...),
+                                             mu=Array(0.6, ...),
+                                             nu=Array(0.036, ...)), EmptyState()),
+                     outer=AccumulateState(tag='second_moment',
+                                           count=1,
+                                           value=Array(0.036, ...)))
+
+    .. seealso::
+
+        :func:`.accumulate_cumulative_average`, :func:`.accumulate_most_recent`.
+    """
+    key_func = make_key_func(key)
+
+    def _init(params: optax.Params, inner_state) -> AccumulateState:
+        return AccumulateState({tag: None}, 0, key_func(None, inner_state, params))
+
+    def _update(
+        updates: optax.Updates,
+        state: WrappedState,
+        params: Optional[optax.Params] = None,
+        **extra_args: Any,
+    ) -> AccumulateState:
+        return AccumulateState(
+            {tag: None},
+            state.outer.count + 1,
+            accumulate(
+                state.outer, key_func(updates, state.inner, params, **extra_args)
+            ),
+        )
+
+    return inspect_wrapped(inner, _update, _init, skip_if_traced=skip_if_traced)

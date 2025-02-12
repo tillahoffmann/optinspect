@@ -1,5 +1,4 @@
 import jax
-from jax import numpy as jnp
 import optax
 import optinspect
 import os
@@ -93,3 +92,8 @@ def test_frepr() -> None:
         r"file '.*?optinspect/tests/test_util\.py', line \d+, 1 free var>",
         actual,
     )
+
+
+def test_invalid_key_func() -> None:
+    with pytest.raises(ValueError, match="must be a string, integer, or callable"):
+        optinspect.util.make_key_func(1.3)  # type: ignore[arg-type]

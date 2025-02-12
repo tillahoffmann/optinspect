@@ -34,9 +34,7 @@ optinspect
     >>> value, grad = value_and_grad(params)
     >>> updates, state = optim.update(grad, state, value=value)
     >>> optinspect.get_traced_values(state)
-    {'raw': Array(8., dtype=float32, weak_type=True),
-     'clipped': Array(1., dtype=float32),
-     'adam_nu': Array(0.001, dtype=float32)}
+    {'raw': Array(8., ...), 'clipped': Array(1., ...), 'adam_nu': Array(0.001, ...)}
 
 .. toctree::
 

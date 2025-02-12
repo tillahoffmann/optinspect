@@ -3,10 +3,10 @@ from typing import Any, NamedTuple, Optional, Type, Union
 
 
 def _state_repr(self: NamedTuple) -> str:
-    args = {"tag": self.tag}
+    args = {"tag": self.tag}  # type: ignore[attr-defined]
     args.update({key: value for key, value in zip(self._fields, self) if key != "tag_"})
-    args = ", ".join(f"{key}={repr(value)}" for key, value in args.items())
-    return f"{self.__class__.__name__}({args})"
+    formatted = ", ".join(f"{key}={repr(value)}" for key, value in args.items())
+    return f"{self.__class__.__name__}({formatted})"
 
 
 def _update_tagged_state(cls: Type[NamedTuple]) -> Type[NamedTuple]:
@@ -16,8 +16,8 @@ def _update_tagged_state(cls: Type[NamedTuple]) -> Type[NamedTuple]:
     :code:`tag` property which unwraps the tag from the dictionary.
     """
     assert cls._fields[0] == "tag_", f"The first field of {cls} must be `tag_`."
-    cls.__repr__ = _state_repr
-    cls.tag = property(lambda self: next(iter(self.tag_)))
+    cls.__repr__ = _state_repr  # type: ignore[assignment,method-assign]
+    cls.tag = property(lambda self: next(iter(self.tag_)))  # type: ignore[attr-defined]
     return cls
 
 

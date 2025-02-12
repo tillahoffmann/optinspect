@@ -30,14 +30,17 @@ def test_trace(value_and_grad_and_params: tuple[Callable, optax.Params]) -> None
         params = optax.apply_updates(params, updates)
 
     # Check we can get information directly from the state.
-    assert jnp.allclose(optinspect.get_traced_values(state, "step 2"), value)
+    assert jnp.allclose(
+        optinspect.get_traced_values(state, "step 2"),  # type: ignore[arg-type]
+        value,
+    )
 
 
 def test_trace_duplicate_key() -> None:
     optim = optax.chain(
         optinspect.trace_update("step 1"),
         optax.scale_by_adam(),
-        optinspect.trace_update("step 1"),
+        optinspect.trace_update("step 1", 1),
     )
     state = optim.init(4.0)
     state = optim.update(3.0, state)

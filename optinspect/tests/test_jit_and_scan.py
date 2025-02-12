@@ -24,6 +24,32 @@ mark_transformations = pytest.mark.parametrize(
             ),
             False,
         ),
+        (
+            functools.partial(
+                optinspect.accumulate_update,
+                "tag",
+                optinspect.accumulate_most_recent(),
+            ),
+            False,
+        ),
+        (
+            functools.partial(
+                optinspect.accumulate_wrapped,
+                tag="tag",
+                accumulate=optinspect.accumulate_cumulative_average(),
+                key=lambda _, state, *args, **kwargs: state.nu,
+            ),
+            True,
+        ),
+        (
+            functools.partial(
+                optinspect.accumulate_wrapped,
+                tag="tag",
+                accumulate=optinspect.accumulate_most_recent(),
+                key=lambda _, state, *args, **kwargs: state.nu,
+            ),
+            True,
+        ),
         (functools.partial(optinspect.trace_update, "grad"), False),
         (
             functools.partial(

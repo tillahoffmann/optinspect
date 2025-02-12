@@ -29,10 +29,10 @@ class TraceState(NamedTuple):
 
 def trace_update(
     tag: str,
-    key: Union[str, Callable] = "updates",
+    key: Union[str, int, Callable] = "updates",
     init: Any = None,
     *,
-    skip_if_traced: bool = None,
+    skip_if_traced: Optional[bool] = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
     Trace a gradient update.
@@ -66,8 +66,7 @@ def trace_update(
         >>> value, grad = value_and_grad(params)
         >>> updates, state = optim.update(grad, state, params, value=value)
         >>> optinspect.get_traced_values(state)
-        {'updates_and_value': {'updates': Array(6., dtype=float32, weak_type=True),
-                               'value': Array(9., dtype=float32, weak_type=True)}}
+        {'updates_and_value': {'updates': Array(6., ...), 'value': Array(9., ...)}}
     """
     key_func = make_key_func(key)
 
@@ -88,9 +87,9 @@ def trace_update(
 def trace_wrapped(
     inner: optax.GradientTransformation,
     tag: str,
-    key: Union[str, Callable] = "updates",
+    key: Union[str, int, Callable] = "updates",
     *,
-    skip_if_traced: bool = None,
+    skip_if_traced: Optional[bool] = None,
 ) -> optax.GradientTransformationExtraArgs:
     """
     Trace the state of a wrapped gradient transformation after an update.
@@ -100,7 +99,8 @@ def trace_wrapped(
         tag: Tag for the traced state.
         key: Quantity to trace. If a callable with the same signature as
             :meth:`~optax.GradientTransformationExtraArgs.update`, trace the
-            returned value. If a string, trace arguments by name. If an integer,
+            returned value. The second :code:`state` argument is the state of the
+            wrapped transformation. If a string, trace arguments by name. If an integer,
             trace arguments by their position.
         skip_if_traced: Skip if the state passed to :code`update` is traced.
 
@@ -124,15 +124,13 @@ def trace_wrapped(
         >>> value, grad = value_and_grad(params)
         >>> updates, state = optim.update(grad, state, params, value=value)
         >>> optinspect.get_traced_values(state)
-        {'second_moment': Array(0.036, dtype=float32, weak_type=True)}
+        {'second_moment': Array(0.036, ...)}
     """
-    inner = optax.with_extra_args_support(inner)
     key_func = make_key_func(key)
 
-    def _init(params: optax.Params) -> WrappedState:
-        inner_state = inner.init(params)
+    def _init(params: optax.Params, inner_state: optax.OptState) -> TraceState:
         value = key_func(None, inner_state, params)
-        return WrappedState(inner_state, TraceState({tag: None}, value))
+        return TraceState({tag: None}, value)
 
     def _update(
         updates: optax.Updates,
