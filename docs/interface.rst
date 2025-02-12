@@ -26,7 +26,13 @@ Interface
     :members:
 
 :mod:`~optinspect.accumulate`
------------------------------------
+-----------------------------
 
 .. automodule:: optinspect.accumulate
+    :members:
+
+:mod:`~optinspect.util`
+-----------------------
+
+.. automodule:: optinspect.util
     :members:

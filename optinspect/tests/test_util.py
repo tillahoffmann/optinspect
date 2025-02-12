@@ -1,10 +1,11 @@
 import jax
+from jax import numpy as jnp
 import optax
 import optinspect
 import os
 import pytest
 import re
-from typing import Optional
+from typing import Any, NamedTuple, Optional
 from unittest import mock
 
 
@@ -86,10 +87,16 @@ def test_get_skip(
 
 def test_frepr() -> None:
     a = 3
-    actual = optinspect.frepr(lambda x: a + x)
+    actual = optinspect.func_repr(lambda x: a + x, freevars=False)
     assert re.match(
         r"<function optinspect\.tests\.test_util\.test_frepr\.<locals>\.<lambda>\(x\), "
         r"file '.*?optinspect/tests/test_util\.py', line \d+, 1 free var>",
+        actual,
+    )
+    actual = optinspect.func_repr(lambda x: a + x)
+    assert re.match(
+        r"<function optinspect\.tests\.test_util\.test_frepr\.<locals>\.<lambda>\(x\), "
+        r"file '.*?optinspect/tests/test_util\.py', line \d+, free var: {'a': 3}>",
         actual,
     )
 
@@ -97,3 +104,26 @@ def test_frepr() -> None:
 def test_invalid_key_func() -> None:
     with pytest.raises(ValueError, match="must be a string, integer, or callable"):
         optinspect.util.make_key_func(1.3)  # type: ignore[arg-type]
+
+
+def test_tree_get_set() -> None:
+    class TestTuple(NamedTuple):
+        c: Any
+        d: Any
+
+    tree: Any = {"a": TestTuple(3, jnp.arange(2, 5)), "b": "hello world"}
+    key = ["a", jax.tree_util.GetAttrKey("d"), slice(2)]
+    assert jnp.allclose(optinspect.tree_get(tree, key), 2 + jnp.arange(2))
+
+    new = optinspect.tree_set(tree, key, 17)
+    assert jnp.allclose(new["a"].d, jnp.array([17, 17, 4]))
+
+    # Try named tuple access by index, and getattrkey.
+    tree = TestTuple(3, 4)
+    assert optinspect.tree_get(tree, 1) == 4
+    assert optinspect.tree_get(tree, [jax.tree_util.GetAttrKey("d")]) == 4
+
+    assert optinspect.tree_set(tree, 1, 9) == TestTuple(3, 9)
+    assert optinspect.tree_set(tree, [jax.tree_util.GetAttrKey("d")], 7) == TestTuple(
+        3, 7
+    )

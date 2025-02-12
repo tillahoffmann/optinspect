@@ -12,3 +12,9 @@ description = "Inspect and debug optax gradient transformations."
 [tool.setuptools.packages]
 
 find = {}
+
+[tool.pytest.ini_options]
+doctest_optionflags = [
+    "ELLIPSIS",
+    "NORMALIZE_WHITESPACE",
+]
