@@ -19,15 +19,16 @@
 ...     optax.clip_by_global_norm(1.0),
 ...     optinspect.trace_update("clipped"),
 ...     optinspect.trace_wrapped(
-...         optax.scale_by_adam(), "adam_nu", key=lambda state, **_: state.nu
+...         optax.scale_by_adam(),
+...         "adam_nu",
+...         key=lambda _, state, *args, **kwargs: state.nu,
 ...     ),
 ...     optax.scale_by_learning_rate(0.01),
 ... )
 >>> state = optim.init(params)
 >>> value, grad = value_and_grad(params)
 >>> updates, state = optim.update(grad, state, value=value)
->>> optinspect.get_trace(state)
-{'raw': Array(8., dtype=float32, weak_type=True),
- 'clipped': Array(1., dtype=float32),
- 'adam_nu': Array(0.001, dtype=float32)}
+>>> optinspect.get_traced_values(state)
+{'raw': Array(8., ...), 'clipped': Array(1., ...), 'adam_nu': Array(0.001, ...)}
+
 ```

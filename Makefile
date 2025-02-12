@@ -7,6 +7,7 @@ docs :
 	sphinx-build docs docs/_build
 
 doctests :
+	python -m doctest -o NORMALIZE_WHITESPACE -o ELLIPSIS README.md
 	sphinx-build -b doctest docs docs/_build
 
 tests :

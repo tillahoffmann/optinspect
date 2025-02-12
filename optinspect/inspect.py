@@ -59,8 +59,8 @@ def inspect_update(
         >>> state = optim.init(params)
         >>> value, grad = value_and_grad(params)
         >>> updates, state = optim.update(grad, state, params, value=value)
-        args: (Array(6., dtype=float32, weak_type=True), EmptyState(), 3.0),
-        kwargs: {'value': Array(9., dtype=float32, weak_type=True)}
+        args: (Array(6., ...), EmptyState(), 3.0),
+        kwargs: {'value': Array(9., ...)}
     """
 
     _init = init or (lambda _: optax.EmptyState())
@@ -134,9 +134,7 @@ def inspect_wrapped(
         >>> state = optim.init(params)
         >>> value, grad = value_and_grad(params)
         >>> updates, state = optim.update(grad, state, params, value=value)
-        ScaleByAdamState(count=Array(1, dtype=int32),
-                         mu=Array(0.6, dtype=float32, weak_type=True),
-                         nu=Array(0.036, dtype=float32, weak_type=True))
+        ScaleByAdamState(count=Array(1, ...), mu=Array(0.6, ...), nu=Array(0.036, ...))
     """
     inner = optax.with_extra_args_support(inner)
 

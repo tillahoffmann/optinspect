@@ -66,8 +66,7 @@ def trace_update(
         >>> value, grad = value_and_grad(params)
         >>> updates, state = optim.update(grad, state, params, value=value)
         >>> optinspect.get_traced_values(state)
-        {'updates_and_value': {'updates': Array(6., dtype=float32, weak_type=True),
-                               'value': Array(9., dtype=float32, weak_type=True)}}
+        {'updates_and_value': {'updates': Array(6., ...), 'value': Array(9., ...)}}
     """
     key_func = make_key_func(key)
 
@@ -125,7 +124,7 @@ def trace_wrapped(
         >>> value, grad = value_and_grad(params)
         >>> updates, state = optim.update(grad, state, params, value=value)
         >>> optinspect.get_traced_values(state)
-        {'second_moment': Array(0.036, dtype=float32, weak_type=True)}
+        {'second_moment': Array(0.036, ...)}
     """
     key_func = make_key_func(key)
 
