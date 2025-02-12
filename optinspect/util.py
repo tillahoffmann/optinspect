@@ -1,9 +1,7 @@
-import functools
 import inspect
 import jax
 from jax.core import Tracer
 import optax
-import os
 from typing import Any, Callable, Optional, Union
 
 

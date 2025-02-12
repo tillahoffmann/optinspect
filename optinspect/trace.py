@@ -29,7 +29,7 @@ class TraceState(NamedTuple):
 
 def trace_update(
     tag: str,
-    key: Union[str, Callable] = "updates",
+    key: Union[str, int, Callable] = "updates",
     init: Any = None,
     *,
     skip_if_traced: bool = None,
@@ -88,7 +88,7 @@ def trace_update(
 def trace_wrapped(
     inner: optax.GradientTransformation,
     tag: str,
-    key: Union[str, Callable] = "updates",
+    key: Union[str, int, Callable] = "updates",
     *,
     skip_if_traced: bool = None,
 ) -> optax.GradientTransformationExtraArgs:

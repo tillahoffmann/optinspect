@@ -36,9 +36,8 @@ mark_transformations = pytest.mark.parametrize(
             functools.partial(
                 optinspect.accumulate_wrapped,
                 tag="tag",
-                accumulate=optinspect.accumulate_cumulative_average(
-                    key=lambda _, state, *args, **kwargs: state.inner.nu,
-                ),
+                accumulate=optinspect.accumulate_cumulative_average(),
+                key=lambda _, state, *args, **kwargs: state.nu,
             ),
             True,
         ),
@@ -46,9 +45,8 @@ mark_transformations = pytest.mark.parametrize(
             functools.partial(
                 optinspect.accumulate_wrapped,
                 tag="tag",
-                accumulate=optinspect.accumulate_most_recent(
-                    key=lambda _, state, *args, **kwargs: state.inner.nu,
-                ),
+                accumulate=optinspect.accumulate_most_recent(),
+                key=lambda _, state, *args, **kwargs: state.nu,
             ),
             True,
         ),

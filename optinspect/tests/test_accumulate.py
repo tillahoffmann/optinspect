@@ -12,7 +12,7 @@ from typing import Any, Callable
         (optinspect.accumulate_cumulative_average(), 4.5),
         (optinspect.accumulate_cumulative_average(period=4), 8.5),
         (
-            optinspect.accumulate_most_recent(lambda _1, state, *_2, **_3: state.count),
+            optinspect.accumulate_most_recent(),
             9,
         ),
         (optinspect.accumulate_cumulative_average(0), 4.5),
@@ -61,9 +61,8 @@ def test_accumulate_wrapped() -> None:
     optim = optinspect.accumulate_wrapped(
         optax.adam(0.1),
         "mu",
-        optinspect.accumulate_cumulative_average(
-            lambda _, state, *args, **kwargs: state.inner[0].mu
-        ),
+        optinspect.accumulate_cumulative_average(),
+        lambda _, state, *args, **kwargs: state[0].mu,
     )
     state = optim.init(3.0)
 
@@ -76,8 +75,3 @@ def test_accumulate_wrapped() -> None:
     expected /= n
     actual = optinspect.get_accumulated_values(state, "mu")
     assert jnp.allclose(actual, expected)
-
-
-def test_accumulate_invalid_key() -> None:
-    with pytest.raises(ValueError, match="must be a string, integer, or callable"):
-        optinspect.accumulate_cumulative_average(key=1.3)
