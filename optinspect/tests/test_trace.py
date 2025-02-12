@@ -23,14 +23,14 @@ def test_trace(value_and_grad_and_params: tuple[Callable, optax.Params]) -> None
         updates, state = optim.update(grad, state, params, value=value)
 
         # Validate trace.
-        trace = optinspect.get_trace(state)
+        trace = optinspect.get_traced_values(state)
         assert jnp.allclose(trace["step 2"], value)
 
         # Update parameters.
         params = optax.apply_updates(params, updates)
 
     # Check we can get information directly from the state.
-    assert jnp.allclose(optinspect.get_trace(state, "step 2"), value)
+    assert jnp.allclose(optinspect.get_traced_values(state, "step 2"), value)
 
 
 def test_trace_duplicate_key() -> None:
@@ -41,8 +41,8 @@ def test_trace_duplicate_key() -> None:
     )
     state = optim.init(4.0)
     state = optim.update(3.0, state)
-    with pytest.raises(ValueError, match="Duplicate name `step 1` in trace."):
-        optinspect.get_trace(state)
+    with pytest.raises(ValueError, match="Duplicate tag `step 1`."):
+        optinspect.get_traced_values(state)
 
 
 def test_trace_wrapped(
@@ -55,5 +55,5 @@ def test_trace_wrapped(
     state = optim.init(params)
     value, grad = value_and_grad(params)
     _, state = optim.update(grad, state, params, value=value)
-    trace = optinspect.get_trace(state)
+    trace = optinspect.get_traced_values(state)
     assert jnp.allclose(trace["mu"], state.inner[0].mu)
