@@ -220,7 +220,6 @@ def accumulate_wrapped(
     tag: str,
     accumulate: optax.GradientTransformationExtraArgs,
     key: Union[str, int, Callable] = "updates",
-    init: Optional[optax.TransformInitFn] = None,
     *,
     skip_if_traced: bool = None,
 ) -> optax.GradientTransformationExtraArgs:
@@ -233,9 +232,6 @@ def accumulate_wrapped(
         accumulate: Accumulation function with the same signature as
             :meth:`~optax.GradientTransformationExtraArgs.update`, returning the updated
             accumulated value.
-        init: Callable to initialize the :class:`.AccumulateState` or :code:`None` to
-            initialize with the parameters passed to the :code:`init` function of the
-            transformation.
         skip_if_traced: Skip accumulation if the :code:`updates` argument is traced.
 
     Returns:
