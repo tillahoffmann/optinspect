@@ -13,15 +13,64 @@ def make_key_func(key: Union[str, int, Callable]) -> Callable:
     :class:`~optax.TransformUpdateExtraArgsFn` function.
 
     Args:
-        key: :class:`str` to retrieve an argument by name, :class:`int` to retrieve a
-            positional argument, or a callable which is returned unchanged.
+        key: Key to extract. If a :class:`str`, arguments are retrieved by name. If an
+            :class:`int` positional arguments are retrieved by index. If a keyword-only
+            callable, it is called with the specified named arguments to retrieve a
+            value (names not appearing in the signature are silently discarded). Any
+            other callable is returned unchanged.
 
     Returns:
         Function to extract a value from the arguments of a
         :class:`~optax.TransformUpdateExtraArgsFn` function.
+
+    Example:
+        >>> from optinspect.util import make_key_func
+        >>>
+        >>> args = ("updates", "state", "params")
+        >>> kwargs = {"value": 3}
+        >>>
+        >>> make_key_func(2)(*args, **kwargs)
+        'params'
+        >>> make_key_func("value")(*args, **kwargs)
+        3
+        >>> make_key_func(lambda *, updates, value: value * updates)(*args, **kwargs)
+        'updatesupdatesupdates'
     """
     if callable(key):
-        return key
+        # Identify acceptable parameter names for keyword-only callables or return the
+        # key unchanged if not a keyword-only callable.
+        signature = inspect.signature(key)
+        argnames = set()
+        has_var_keywords = False
+        for name, param in signature.parameters.items():
+            if param.kind == param.KEYWORD_ONLY:
+                argnames.add(name)
+            elif param.kind == param.VAR_KEYWORD:
+                has_var_keywords = True
+            else:
+                # This is not a keyword-only callable. Return it unchanged.
+                return key
+
+        def _key_func(
+            updates: optax.Updates,
+            state: optax.OptState,
+            params: Optional[optax.Params] = None,
+            **extra_args: Any,
+        ) -> Any:
+            extra_args.update(
+                {
+                    "updates": updates,
+                    "state": state,
+                    "params": params,
+                }
+            )
+            if has_var_keywords:
+                return key(**extra_args)
+            return key(
+                **{key: value for key, value in extra_args.items() if key in argnames}
+            )
+
+        return _key_func
     elif isinstance(key, int):
         return lambda *args, **_: args[key]
     elif isinstance(key, str):

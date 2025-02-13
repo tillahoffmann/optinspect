@@ -106,6 +106,25 @@ def test_invalid_key_func() -> None:
         optinspect.util.make_key_func(1.3)  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize(
+    "key, expected",
+    [
+        ("state", "arg2"),
+        (2, "arg3"),
+        (lambda *, extra: 2 * extra, "kwargkwarg"),
+        (lambda *, state: state.split("g"), ["ar", "2"]),
+        (lambda **kwargs: kwargs["updates"] + kwargs["params"], "arg1arg3"),
+        (lambda *, params, **kwargs: kwargs["updates"] + params, "arg1arg3"),
+    ],
+)
+def test_make_key_func(key, expected) -> None:
+    args = ("arg1", "arg2", "arg3")
+    kwargs = {"extra": "kwarg"}
+    key_func = optinspect.util.make_key_func(key)
+    actual = key_func(*args, **kwargs)
+    assert actual == expected
+
+
 def test_tree_get_set() -> None:
     class TestTuple(NamedTuple):
         c: Any
