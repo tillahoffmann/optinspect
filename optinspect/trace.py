@@ -56,9 +56,7 @@ def trace_update(
         >>>
         >>> optim = optinspect.trace_update(
         ...     "updates_and_value",
-        ...     lambda updates, *args, value, **kwargs: {
-        ...         "updates": updates, "value": value
-        ...     }
+        ...     lambda *, updates, value: {"updates": updates, "value": value},
         ... )
         >>> params = 3.0
         >>> value_and_grad = jax.value_and_grad(jnp.square)
@@ -116,7 +114,7 @@ def trace_wrapped(
         >>> optim = optinspect.trace_wrapped(
         ...     optax.adam(0.1),
         ...     "second_moment",
-        ...     lambda _, state, *args, **kwargs: state[0].nu,
+        ...     lambda *, state: state[0].nu,
         ... )
         >>> params = 3.0
         >>> value_and_grad = jax.value_and_grad(jnp.square)

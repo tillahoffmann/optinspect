@@ -26,7 +26,7 @@ optinspect
     ...     optinspect.trace_wrapped(
     ...         optax.scale_by_adam(),
     ...         "adam_nu",
-    ...         key=lambda _, state, *args, **kwargs: state.nu,
+    ...         key=lambda *, state: state.nu,
     ...     ),
     ...     optax.scale_by_learning_rate(0.01),
     ... )

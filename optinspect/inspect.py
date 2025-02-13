@@ -127,7 +127,7 @@ def inspect_wrapped(
         >>>
         >>> optim = optinspect.inspect_wrapped(
         ...     optax.adam(0.1),
-        ...     lambda _, state, *args, **kwargs: print(state.inner[0])
+        ...     lambda updates, state, params, **extra_args: print(state.inner[0])
         ... )
         >>> params = 3.0
         >>> value_and_grad = jax.value_and_grad(jnp.square)
