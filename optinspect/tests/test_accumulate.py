@@ -62,7 +62,7 @@ def test_accumulate_wrapped() -> None:
         optax.adam(0.1),
         "mu",
         optinspect.accumulate_cumulative_average(),
-        lambda _, state, *args, **kwargs: state[0].mu,
+        lambda *, state: state[0].mu,
     )
     state = optim.init(3.0)
 

@@ -246,7 +246,7 @@ def accumulate_wrapped(
         ...     inner=optax.adam(1e-3),
         ...     tag="second_moment",
         ...     accumulate=optinspect.accumulate_cumulative_average(),
-        ...     key=lambda _, state, *args, **kwargs: state[0].nu
+        ...     key=lambda *, state: state[0].nu
         ... )
         >>> params = 3.0
         >>> value_and_grad = jax.value_and_grad(jnp.square)

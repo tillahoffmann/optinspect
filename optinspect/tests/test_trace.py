@@ -53,7 +53,7 @@ def test_trace_wrapped(
 ) -> None:
     value_and_grad, params = value_and_grad_and_params
     optim = optinspect.trace_wrapped(
-        optax.adam(0.1), "mu", key=lambda _, state, *args, **kwargs: state[0].mu
+        optax.adam(0.1), "mu", key=lambda *, state: state[0].mu
     )
     state = optim.init(params)
     value, grad = value_and_grad(params)

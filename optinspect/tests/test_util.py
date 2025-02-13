@@ -22,7 +22,7 @@ def test_wrapped(value_and_grad_and_params, skip_if_traced: bool) -> None:
     update: list[optax.ScaleByAdamState] = []
     optim = optinspect.inspect_wrapped(
         optax.scale_by_adam(0.1),
-        lambda updates, state, *args, **kwargs: update.append(state.inner),
+        lambda updates, state, params, **extra_args: update.append(state.inner),
         skip_if_traced=skip_if_traced,
     )
     state = optim.init(params)
@@ -115,6 +115,7 @@ def test_invalid_key_func() -> None:
         (lambda *, state: state.split("g"), ["ar", "2"]),
         (lambda **kwargs: kwargs["updates"] + kwargs["params"], "arg1arg3"),
         (lambda *, params, **kwargs: kwargs["updates"] + params, "arg1arg3"),
+        (lambda updates, state, params, **extra_args: state, "arg2"),
     ],
 )
 def test_make_key_func(key, expected) -> None:
