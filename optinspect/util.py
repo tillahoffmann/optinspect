@@ -232,6 +232,37 @@ def tree_set(tree: Any, path: Union[Iterable, Any], value: Any) -> Any:
     return _set(tree, key, value)
 
 
+def with_tree_get(func: Callable, path: Union[Iterable, Any]) -> Callable:
+    """
+    Create a function :code:`transformed(*args, **kwargs)` that extracts the subtree of
+    :code:`func(*args, **kwargs)` at :code:`path`.
+
+    Args:
+        func: Function to transform.
+        path: Path in the returned tree at which to extract values. If not iterable, the
+            path is assumed to be a key and is replaced by :code:`(path,)`.
+
+    Returns:
+        Transformed function.
+
+    Example:
+        >>> import optinspect
+        >>>
+        >>> def func(x):
+        ...     return {"a": [3, 4], "b": [19 * x, 2]}
+        >>>
+        >>> optinspect.with_tree_get(func, ["b", 0])(2)
+        38
+    """
+
+    @functools.wraps(func)
+    def _inner(*args, **kwargs):
+        tree = func(*args, **kwargs)
+        return tree_get(tree, path)
+
+    return _inner
+
+
 def with_tree_set(func: Callable, x: Any, path: Union[Iterable, Any]) -> Callable:
     """
     Create a function :code:`transformed(y, *args, **kwargs)` that evaluates
@@ -276,6 +307,7 @@ def with_tree_set(func: Callable, x: Any, path: Union[Iterable, Any]) -> Callabl
         Array(-0., ...)
     """
 
+    @functools.wraps(func)
     def _inner(y, *args, **kwargs) -> Any:
         replaced_x = tree_set(x, path, y)
         # breakpoint()
